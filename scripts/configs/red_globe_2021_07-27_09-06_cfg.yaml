@@ -1,0 +1,7 @@
+_BASE_: "mask_rcnn_R_101_FPN_3x.yaml"
+MODEL:
+  ROI_HEADS:
+    NUM_CLASSES: 1
+  RETINANET:
+    NUM_CLASSES: 1
+  

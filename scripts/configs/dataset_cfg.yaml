@@ -1,0 +1,4 @@
+DATASET:
+  NAME: "red_globe_2021_07-27_09-06"
+  ANNOTATIONS_PATH: "/home/bertoglio/data/red_globe_2021_07-27_09-06/annotations/red_globe_2021_07-27_09-06.json"
+  IMAGES_PATH: "/home/bertoglio/data/red_globe_2021_07-27_09-06/images/"
