@@ -1,6 +1,9 @@
 # AIRLab server docker stuff
 .runconfigs
-home/
+home
+
+# Detectron2 stuff
+output
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
