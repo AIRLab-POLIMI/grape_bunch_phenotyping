@@ -1,4 +1,6 @@
 DATASET:
   NAME: "red_globe_2021_07-27_09-06"
-  ANNOTATIONS_PATH: "/home/bertoglio/data/red_globe_2021_07-27_09-06/annotations/red_globe_2021_07-27_09-06.json"
-  IMAGES_PATH: "/home/bertoglio/data/red_globe_2021_07-27_09-06/images/"
+  ANNOTATIONS_PATH_TRAIN: "/home/bertoglio/data/red_globe_2021_07-27_09-06_split/annotations/red_globe_2021_07-27_09-06_train.json"
+  ANNOTATIONS_PATH_TEST: "/home/bertoglio/data/red_globe_2021_07-27_09-06_split/annotations/red_globe_2021_07-27_09-06_test.json"
+  IMAGES_PATH_TRAIN: "/home/bertoglio/data/red_globe_2021_07-27_09-06_split/images_train/"
+  IMAGES_PATH_TEST: "/home/bertoglio/data/red_globe_2021_07-27_09-06_split/images_test/"

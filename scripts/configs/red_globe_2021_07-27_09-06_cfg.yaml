@@ -1,7 +1,20 @@
 _BASE_: "mask_rcnn_R_101_FPN_3x.yaml"
 MODEL:
   ROI_HEADS:
-    NUM_CLASSES: 1
+    NUM_CLASSES: 1              # only has one class (bunch)
+    BATCH_SIZE_PER_IMAGE: 128   # The "RoIHead batch size". 128 is faster, and good enough for this toy dataset (default: 512)
   RETINANET:
     NUM_CLASSES: 1
+DATASETS:
+  TRAIN: ("red_globe_2021_07-27_09-06_TRAIN",)
+  TEST: ("red_globe_2021_07-27_09-06_TEST",)
+DATALOADER:
+  NUM_WORKERS: 2
+SOLVER:
+  IMS_PER_BATCH: 2  # This is the real "batch size" commonly known to deep learning people
+  BASE_LR: 0.00025  # pick a good LR
+  MAX_ITER: 300     # 300 iterations seems good enough for this toy dataset; you will need to train longer for a practical dataset
+  STEPS: []         # do not decay learning rate
+
+# TODO: IMAGE TYPE RGB OR BGR?
   

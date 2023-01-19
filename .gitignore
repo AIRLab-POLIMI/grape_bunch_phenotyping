@@ -1,8 +1,11 @@
 # AIRLab server docker stuff
 .runconfigs
-home
+docker_run.txt
 
-# Detectron2 stuff
+# VS Code
+.vscode
+
+# Detectron2
 output
 
 # Byte-compiled / optimized / DLL files
