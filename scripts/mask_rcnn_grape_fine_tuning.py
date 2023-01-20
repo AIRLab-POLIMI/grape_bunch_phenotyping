@@ -19,6 +19,13 @@ from detectron2.utils.events import EventStorage
 from collections import OrderedDict
 from detectron2.evaluation import inference_on_dataset, print_csv_format, DatasetEvaluators, COCOEvaluator
 
+# Logging metadata with Neptune
+import neptune.new as neptune
+from neptune.new.types import File
+
+run = neptune.init(project='AIRLab/grape-bunch-phenotyping',
+                   api_token=NEPTUNE_API_TOKEN)
+
 
 logger = logging.getLogger("detectron2")
 
@@ -40,7 +47,9 @@ def get_evaluator(cfg, dataset_name, output_folder=None):
     #         output_dir=output_folder,
     #     )
     # )
-    evaluator_list.append(COCOEvaluator(dataset_name, output_dir=output_folder))
+    evaluator_list.append(COCOEvaluator(dataset_name, 
+                                        output_dir=output_folder,
+                                        allow_cached_coco=False)) # our dataset is small, so we do not need caching
    
     if len(evaluator_list) == 0:
         raise NotImplementedError(
@@ -124,6 +133,9 @@ def do_train(cfg, model, resume=False):
             losses_reduced = sum(loss for loss in loss_dict_reduced.values())
             if comm.is_main_process():
                 storage.put_scalars(total_loss=losses_reduced, **loss_dict_reduced)
+            
+            # # creating a logging object so that you can track it on Neptune dashboard
+            # run['metrics/total_train_loss'].log(losses_reduced)
 
             optimizer.zero_grad()
             losses.backward()
