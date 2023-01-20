@@ -179,7 +179,7 @@ def main(args):
 
     # custom configurations
     dataset_cfg = get_dataset_cfg_defaults()
-    dataset_cfg.merge_from_file("./configs/dataset_cfg.yaml")
+    dataset_cfg.merge_from_file("./configs/dataset_train_cfg.yaml")
     dataset_cfg.freeze()
     
     for split_name in ['TRAIN', 'TEST']:
