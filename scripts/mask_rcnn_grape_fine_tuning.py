@@ -269,14 +269,12 @@ def main(args):
     neptune_callback = optuna_utils.NeptuneCallback(run)
 
     # Pass NeptuneCallback to Optuna Study .optimize()
-    study = optuna.create_study(direction="maximize")
+    study = optuna.create_study(direction="maximize", study_name="lr_freeze_warmiters")
     study.optimize(functools.partial(objective, cfg=cfg, args=args),  # I use functools to create a new function with the additional arguments
-                   n_trials=5,            # The number of trials for each process
+                   n_trials=1,            # The number of trials for each process
                    timeout=600,            # Stop study after the given number of seconds
                    n_jobs=1,               # The number of parallel jobs. If -1, the number is set to CPU count
                    callbacks=[neptune_callback])
-
-    return 0        # the launch function of detectron2 wants a value to be returned
 
 
 if __name__ == "__main__":
