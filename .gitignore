@@ -2,6 +2,9 @@
 .runconfigs
 docker_run.txt
 
+# Neptune
+.neptune
+
 # VS Code
 .vscode
 
