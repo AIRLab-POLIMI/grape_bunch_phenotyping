@@ -22,6 +22,10 @@ from detectron2.evaluation import inference_on_dataset, print_csv_format, Datase
 # Logging metadata with Neptune
 import neptune.new as neptune
 
+# Hyperparameters optimization with Optuna
+import neptune.new.integrations.optuna as optuna_utils
+import optuna
+
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging
                        name='test',
@@ -50,7 +54,9 @@ def get_evaluator(cfg, dataset_name, output_folder=None):
     # )
     evaluator_list.append(COCOEvaluator(dataset_name, 
                                         output_dir=output_folder,
-                                        allow_cached_coco=False)) # our dataset is small, so we do not need caching
+                                        allow_cached_coco=False,    # our dataset is small, so we do not need caching
+                                        use_fast_impl=True))        # use a fast but unofficial implementation to compute AP. 
+                                                                    # compute results with the official API for use in papers
    
     if len(evaluator_list) == 0:
         raise NotImplementedError(
@@ -73,6 +79,8 @@ def do_test(cfg, model):
         if comm.is_main_process():
             logger.info("Evaluation results for {} in csv format:".format(dataset_name))
             print_csv_format(results_i)
+            # AP50 logging with Neptune
+            run['metrics/AP50_segm_test'].log(results_i['segm']['AP50'])
     if len(results) == 1:
         results = list(results.values())[0]
     return results
@@ -83,8 +91,8 @@ def do_train(cfg, model, resume=False):
     # This helps to inform layers which are
     # designed to behave differently during
     # training and evaluation (like Dropout
-    # and BatchNorm). 
-    model.train()   
+    # and BatchNorm).
+    model.train()
 
     optimizer = build_optimizer(cfg, model)
     scheduler = build_lr_scheduler(cfg, optimizer)
@@ -135,7 +143,7 @@ def do_train(cfg, model, resume=False):
             if comm.is_main_process():
                 storage.put_scalars(total_loss=losses_reduced, **loss_dict_reduced)
             
-            # creating a Neptune logging object
+            # loss logging with Neptune
             run['metrics/total_train_loss'].log(losses_reduced)
 
             optimizer.zero_grad()
@@ -180,20 +188,37 @@ def setup(args):
     cfg.merge_from_file(args.config_file)   # load values from a file
     cfg.merge_from_list(args.opts)          # load values from a list of str
 
-    cfg.freeze()
+    # cfg.freeze()                          # I cannot freeze cfg for hyperparam tuning
     default_setup(
         cfg, args
     )  # if you don't like any of the default setup, write your own setup code
     return cfg
 
 
+# def objective(trial):
+#     do_train(cfg, model, resume=args.resume)
+#     do_test(cfg, model)
+
+#     trial.report(accuracy, epoch)
+
+#     # Handle pruning based on the intermediate value.
+#     if trial.should_prune():
+#         raise optuna.exceptions.TrialPruned()
+
+#     return
+
+
 def main(args):
-    cfg = setup(args)                       # load configurations
+    # ------ CONFIGURATIONS ------
+
+    cfg = setup(args)               # load detectron2 configurations
 
     # custom configurations
     dataset_cfg = get_dataset_cfg_defaults()
     dataset_cfg.merge_from_file("./configs/dataset_train_cfg.yaml")
     dataset_cfg.freeze()
+
+    # ------ NEPTUNE LOGGING ------
 
     # Define parameters for Neptune
     PARAMS = {'dataset_train': cfg.DATASETS.TRAIN,
@@ -214,11 +239,24 @@ def main(args):
 
     # Pass parameters to the Neptune run object.
     run['parameters'] = PARAMS          # This will create a ‘parameters directory containing the PARAMS dictionary
+
+    # ------ OPTUNA ------
+
+    # Create a NeptuneCallback for Optuna
+    # neptune_callback = optuna_utils.NeptuneCallback(run)
+
+    # Pass NeptuneCallback to Optuna Study .optimize()
+    # study = optuna.create_study(direction="minimize")
+    # study.optimize(objective, n_trials=100, timeout=600, callbacks=[neptune_callback])
+
+    # ------ DATASETS ------
     
     for split_name in ['TRAIN', 'TEST']:
         DatasetCatalog.register(dataset_cfg.DATASET.NAME+"_"+split_name,
                                 lambda: get_dataset_dicts(dataset_cfg, split_name))           # register the dataset
         MetadataCatalog.get(dataset_cfg.DATASET.NAME+"_"+split_name).thing_colors = [(255, 0, 0)]              # add color metadata for bunches
+
+    # ------ MODEL ------
 
     model = build_model(cfg)
     logger.info("Model:\n{}".format(model))
@@ -234,7 +272,12 @@ def main(args):
             model, device_ids=[comm.get_local_rank()], broadcast_buffers=False
         )
 
+    # ------ TRAIN AND TEST ------
+
+    cfg.SOLVER.BASE_LR = 0.0001
+
     do_train(cfg, model, resume=args.resume)
+
     return do_test(cfg, model)
 
 
