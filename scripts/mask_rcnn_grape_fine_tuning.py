@@ -21,10 +21,11 @@ from detectron2.evaluation import inference_on_dataset, print_csv_format, Datase
 
 # Logging metadata with Neptune
 import neptune.new as neptune
-from neptune.new.types import File
 
-run = neptune.init(project='AIRLab/grape-bunch-phenotyping',
-                   api_token=NEPTUNE_API_TOKEN)
+run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
+                       mode='async',        # use 'debug' to turn off logging
+                       name='test',
+                       tags=[])
 
 
 logger = logging.getLogger("detectron2")
@@ -134,8 +135,8 @@ def do_train(cfg, model, resume=False):
             if comm.is_main_process():
                 storage.put_scalars(total_loss=losses_reduced, **loss_dict_reduced)
             
-            # # creating a logging object so that you can track it on Neptune dashboard
-            # run['metrics/total_train_loss'].log(losses_reduced)
+            # creating a Neptune logging object
+            run['metrics/total_train_loss'].log(losses_reduced)
 
             optimizer.zero_grad()
             losses.backward()
@@ -193,6 +194,26 @@ def main(args):
     dataset_cfg = get_dataset_cfg_defaults()
     dataset_cfg.merge_from_file("./configs/dataset_train_cfg.yaml")
     dataset_cfg.freeze()
+
+    # Define parameters for Neptune
+    PARAMS = {'dataset_train': cfg.DATASETS.TRAIN,
+              'dataset_test': cfg.DATASETS.TEST,
+              'dataloader_num_workers': cfg.DATALOADER.NUM_WORKERS,
+              'freeze_at': cfg.MODEL.BACKBONE.FREEZE_AT,
+              'batch_size_train': cfg.SOLVER.IMS_PER_BATCH,
+              'max_iter': cfg.SOLVER.MAX_ITER,
+              'learning_rate': cfg.SOLVER.BASE_LR,
+              'momentum': cfg.SOLVER.MOMENTUM,
+              'weight_decay': cfg.SOLVER.WEIGHT_DECAY,
+              'gamma': cfg.SOLVER.GAMMA,
+              'steps': cfg.SOLVER.STEPS,
+              'warmup_factor': cfg.SOLVER.WARMUP_FACTOR,
+              'warmup_iter': cfg.SOLVER.WARMUP_ITERS,
+              'eval_period': cfg.TEST.EVAL_PERIOD,
+              'optimizer': 'SGD'}
+
+    # Pass parameters to the Neptune run object.
+    run['parameters'] = PARAMS          # This will create a ‘parameters directory containing the PARAMS dictionary
     
     for split_name in ['TRAIN', 'TEST']:
         DatasetCatalog.register(dataset_cfg.DATASET.NAME+"_"+split_name,
