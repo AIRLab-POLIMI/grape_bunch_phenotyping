@@ -12,6 +12,9 @@ MODEL:
 DATASETS:
   TRAIN: ("red_globe_2021_07-27_09-06_TRAIN",)
   TEST: ("red_globe_2021_07-27_09-06_TEST",)
+INPUT:
+  MIN_SIZE_TRAIN: (480, 720)
+  MIN_SIZE_TEST: 0                # Set to zero to disable resize in testing.
 DATALOADER:
   NUM_WORKERS: 2
 SOLVER:

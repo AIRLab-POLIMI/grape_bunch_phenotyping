@@ -19,6 +19,11 @@ from detectron2.solver import build_optimizer, build_lr_scheduler
 from detectron2.utils.events import EventStorage
 from collections import OrderedDict
 from detectron2.evaluation import inference_on_dataset, print_csv_format, DatasetEvaluators, COCOEvaluator
+from fvcore.common.param_scheduler import (
+    ExponentialParamScheduler,
+    MultiStepParamScheduler,
+    StepWithFixedGammaParamScheduler,
+)
 
 # Logging metadata with Neptune
 import neptune.new as neptune
@@ -97,6 +102,26 @@ def get_dataset_dicts(cfg, split_name: str):
         return None
 
 
+def build_exp_lr_scheduler(cfg: CfgNode, optimizer: torch.optim.Optimizer) -> LRScheduler:
+    """
+    Build an exponential LR scheduler.
+    """
+    
+    sched = ExponentialParamScheduler(
+        start_value=cfg.SOLVER.BASE_LR,
+        decay=cfg.SOLVER.GAMMA
+        )
+
+    sched = WarmupParamScheduler(
+        sched,
+        cfg.SOLVER.WARMUP_FACTOR,
+        min(cfg.SOLVER.WARMUP_ITERS / cfg.SOLVER.MAX_ITER, 1.0),
+        cfg.SOLVER.WARMUP_METHOD,
+        cfg.SOLVER.RESCALE_INTERVAL,
+    )
+    return LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)
+
+
 def setup(args):
     """
     Create configs and perform basic setups.
@@ -115,8 +140,8 @@ def setup(args):
 def objective(trial, cfg, args):
 
     # Define hyperparameters to tune with Optuna
-    cfg.SOLVER.BASE_LR = trial.suggest_float("learning_rate", 1e-6, 1e-2, log=True)  # If log is true, the value is sampled from the range in the log domain
-    cfg.MODEL.BACKBONE.FREEZE_AT = trial.suggest_int("freeze_at", 0, 5, step=1)
+    cfg.SOLVER.BASE_LR = trial.suggest_float("learning_rate", 1e-6, 0.5, log=True)  # If log is true, the value is sampled from the range in the log domain
+    cfg.MODEL.BACKBONE.FREEZE_AT = trial.suggest_categorical("freeze_at", [0, 1, 2, 3, 4, 5])
     cfg.SOLVER.WARMUP_ITERS = trial.suggest_int("warmup_iters", 30, 90, step=10)
 
     # ------ MODEL ------
@@ -145,7 +170,8 @@ def objective(trial, cfg, args):
     model.train()
 
     optimizer = build_optimizer(cfg, model)
-    scheduler = build_lr_scheduler(cfg, optimizer)
+    # scheduler = build_lr_scheduler(cfg, optimizer)        # default step scheduler
+    scheduler = build_exp_lr_scheduler(cfg, optimizer)
 
     checkpointer = DetectionCheckpointer(
         model, cfg.OUTPUT_DIR, optimizer=optimizer, scheduler=scheduler
@@ -271,8 +297,8 @@ def main(args):
     # Pass NeptuneCallback to Optuna Study .optimize()
     study = optuna.create_study(direction="maximize", study_name="lr_freeze_warmiters")
     study.optimize(functools.partial(objective, cfg=cfg, args=args),  # I use functools to create a new function with the additional arguments
-                   n_trials=1,            # The number of trials for each process
-                   timeout=600,            # Stop study after the given number of seconds
+                   n_trials=20,            # The number of trials for each process
+                   timeout=None,            # Stop study after the given number of seconds
                    n_jobs=1,               # The number of parallel jobs. If -1, the number is set to CPU count
                    callbacks=[neptune_callback])
 

@@ -10,8 +10,11 @@ MODEL:
 DATASETS:
   TRAIN: ("red_globe_2021_07-27_09-06_TRAIN",)
   TEST: ("red_globe_2021_07-27_09-06_TEST",)
+INPUT:
+  MIN_SIZE_TRAIN: (480, 720)
+  MIN_SIZE_TEST: 0                # Set to zero to disable resize in testing.
 DATALOADER:
-  NUM_WORKERS: 2
+  NUM_WORKERS: 4
 SOLVER:
   IMS_PER_BATCH: 2                # This is the real "batch size" commonly known to deep learning people
   BASE_LR: 0.001                  # possible values: 0.00025                
