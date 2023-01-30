@@ -1,28 +1,7 @@
-_BASE_: "mask_rcnn_R_101_FPN_3x.yaml"
+_BASE_: "mred_globe_2021_07-27_09-06_train_cfg.yaml"
 MODEL:
   WEIGHTS: "output/model_final.pth"
   ROI_HEADS:
-    NUM_CLASSES: 1                # only has one class (bunch)
-    BATCH_SIZE_PER_IMAGE: 128     # The "RoIHead batch size". 128 is faster, and good enough for this toy dataset (default: 512)
     SCORE_THRESH_TEST: 0.05       # Minimum score threshold (assuming scores in a [0, 1] range)
-  RETINANET:
-    NUM_CLASSES: 1
-  BACKBONE:
-    FREEZE_AT: 2                  # default value is 2
-DATASETS:
-  TRAIN: ("red_globe_2021_07-27_09-06_TRAIN",)
-  TEST: ("red_globe_2021_07-27_09-06_TEST",)
 INPUT:
-  MIN_SIZE_TRAIN: (480, 720)
-  MIN_SIZE_TEST: 0                # Set to zero to disable resize in testing.
-DATALOADER:
-  NUM_WORKERS: 2
-SOLVER:
-  IMS_PER_BATCH: 2                # This is the real "batch size" commonly known to deep learning people
-  BASE_LR: 0.001                  # possible values: 0.00025                
-  MAX_ITER: 2400                  # 48 train images -> 24 batches * 100 epochs = 2400 iterations
-  STEPS: [1920, 2160]             # decay learning rate at (0.8 * MAX_ITER) and (0.9 * MAX_ITER)
-  WARMUP_ITERS: 60                # 2.5% of MAX_ITER  
-TEST:
-  EVAL_PERIOD: 24                 # 1 evaluation each epoch with 100 epochs. The period (in terms of steps) to evaluate the model during training
-  
+  MIN_SIZE_TEST: 0                # Set to zero to disable resize in testing

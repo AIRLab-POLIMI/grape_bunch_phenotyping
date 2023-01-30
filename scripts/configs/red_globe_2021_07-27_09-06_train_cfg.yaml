@@ -19,8 +19,9 @@ SOLVER:
   IMS_PER_BATCH: 2                # This is the real "batch size" commonly known to deep learning people
   BASE_LR: 0.001                  # possible values: 0.00025                
   MAX_ITER: 2400                  # 48 train images -> 24 batches * 100 epochs = 2400 iterations
-  STEPS: [1920, 2160]             # decay learning rate at (0.8 * MAX_ITER) and (0.9 * MAX_ITER)
+  STEPS: [1920, 2160]             # decay learning rate at (0.8 * MAX_ITER) and (0.9 * MAX_ITER) -> only used with the STEP lr scheduler
   WARMUP_ITERS: 60                # 2.5% of MAX_ITER  
+  GAMMA: 0.1                      # It is used to control the learning rate decay over time
 TEST:
   EVAL_PERIOD: 24                 # 1 evaluation each epoch with 100 epochs. The period (in terms of steps) to evaluate the model during training
   
