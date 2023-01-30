@@ -19,11 +19,14 @@ from detectron2.solver import build_optimizer, build_lr_scheduler
 from detectron2.utils.events import EventStorage
 from collections import OrderedDict
 from detectron2.evaluation import inference_on_dataset, print_csv_format, DatasetEvaluators, COCOEvaluator
-from fvcore.common.param_scheduler import (
-    ExponentialParamScheduler,
-    MultiStepParamScheduler,
-    StepWithFixedGammaParamScheduler,
-)
+from fvcore.common.param_scheduler import ExponentialParamScheduler
+from detectron2.config import CfgNode
+try:
+    from torch.optim.lr_scheduler import LRScheduler
+except ImportError:
+    from torch.optim.lr_scheduler import _LRScheduler as LRScheduler
+
+from detectron2.solver import WarmupParamScheduler, LRMultiplier
 
 # Logging metadata with Neptune
 import neptune.new as neptune
@@ -140,9 +143,10 @@ def setup(args):
 def objective(trial, cfg, args):
 
     # Define hyperparameters to tune with Optuna
-    cfg.SOLVER.BASE_LR = trial.suggest_float("learning_rate", 1e-6, 0.5, log=True)  # If log is true, the value is sampled from the range in the log domain
+    cfg.SOLVER.BASE_LR = trial.suggest_float("base_lr", 1e-6, 0.5, log=True)  # If log is true, the value is sampled from the range in the log domain
     cfg.MODEL.BACKBONE.FREEZE_AT = trial.suggest_categorical("freeze_at", [0, 1, 2, 3, 4, 5])
     cfg.SOLVER.WARMUP_ITERS = trial.suggest_int("warmup_iters", 30, 90, step=10)
+    cfg.SOLVER.GAMMA = trial.suggest_float("gamma", 0.1, 0.9) 
 
     # ------ MODEL ------
 
@@ -269,7 +273,7 @@ def main(args):
               # 'freeze_at': cfg.MODEL.BACKBONE.FREEZE_AT,
               'batch_size_train': cfg.SOLVER.IMS_PER_BATCH,
               'max_iter': cfg.SOLVER.MAX_ITER,
-              # 'learning_rate': cfg.SOLVER.BASE_LR,
+              # 'base_lr': cfg.SOLVER.BASE_LR,
               'momentum': cfg.SOLVER.MOMENTUM,
               'weight_decay': cfg.SOLVER.WEIGHT_DECAY,
               'gamma': cfg.SOLVER.GAMMA,
@@ -295,9 +299,9 @@ def main(args):
     neptune_callback = optuna_utils.NeptuneCallback(run)
 
     # Pass NeptuneCallback to Optuna Study .optimize()
-    study = optuna.create_study(direction="maximize", study_name="lr_freeze_warmiters")
+    study = optuna.create_study(direction="maximize", study_name="lr_freeze_warmiters", storage='sqlite:///optuna-db/lr_freeze_warmiters.db')
     study.optimize(functools.partial(objective, cfg=cfg, args=args),  # I use functools to create a new function with the additional arguments
-                   n_trials=20,            # The number of trials for each process
+                   n_trials=1,            # The number of trials for each process
                    timeout=None,            # Stop study after the given number of seconds
                    n_jobs=1,               # The number of parallel jobs. If -1, the number is set to CPU count
                    callbacks=[neptune_callback])

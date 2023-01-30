@@ -2,6 +2,9 @@
 .runconfigs
 docker_run.txt
 
+# Optuna
+optuna-db
+
 # Neptune
 .neptune
 
