@@ -1,4 +1,4 @@
-_BASE_: "mred_globe_2021_07-27_09-06_train_cfg.yaml"
+_BASE_: "red_globe_2021_07-27_09-06_train_cfg.yaml"
 MODEL:
   WEIGHTS: "output/model_final.pth"
   ROI_HEADS:
