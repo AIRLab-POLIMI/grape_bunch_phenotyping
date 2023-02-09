@@ -11,6 +11,8 @@ from detectron2.data.datasets import load_coco_json
 from detectron2.data import transforms as T
 from detectron2.data import DatasetMapper   # the default mapper
 from detectron2.data import build_detection_train_loader, build_detection_test_loader
+from detectron2.data import get_detection_dataset_dicts
+from detectron2.data.samplers import InferenceSampler
 from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer, PeriodicCheckpointer
 import detectron2.utils.comm as comm
@@ -33,7 +35,7 @@ import neptune.new as neptune
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
-                       name='freeze_at_0',
+                       name='freeze_at_1',
                        tags=[])
 
 
@@ -72,24 +74,53 @@ def get_evaluator(cfg, dataset_name, output_folder=None):
     return DatasetEvaluators(evaluator_list)
 
 
-def do_test(model, data_loader, evaluator):
-    results = inference_on_dataset(model, data_loader, evaluator)
+def build_test_loss_loader(cfg):
+    dataset = get_detection_dataset_dicts(
+            cfg.DATASETS.TEST,
+            filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS,
+            min_keypoints=cfg.MODEL.ROI_KEYPOINT_HEAD.MIN_KEYPOINTS_PER_IMAGE
+            if cfg.MODEL.KEYPOINT_ON
+            else 0,
+            proposal_files=cfg.DATASETS.PROPOSAL_FILES_TRAIN if cfg.MODEL.LOAD_PROPOSALS else None,
+        )
+    mapper = DatasetMapper(cfg, True)
+    test_sampler = InferenceSampler(len(dataset))
+    return build_detection_train_loader(dataset=dataset,
+                                        mapper=mapper,
+                                        sampler=test_sampler,
+                                        total_batch_size=1,
+                                        aspect_ratio_grouping=cfg.DATALOADER.ASPECT_RATIO_GROUPING,
+                                        num_workers=cfg.DATALOADER.NUM_WORKERS)
+
+
+def do_test(model, test_data_loader, evaluator, test_loss_data_loader=None):
+    results = inference_on_dataset(model, test_data_loader, evaluator)
     if comm.is_main_process():
         logger.info("Evaluation results for test dataset in csv format:")
         print_csv_format(results)
-        # AP50 logging with Neptune
+        # AP logging with Neptune
         run['metrics/AP_segm_test'].log(results['segm']['AP'])
 
-    # for _ , inputs in enumerate(data_loader):
-    #     loss_dict = model(inputs)
-    #     losses = sum(loss_dict.values())
-    #     assert torch.isfinite(losses).all(), loss_dict
-    #     loss_dict_reduced = {k: v.item() for k, v in comm.reduce_dict(loss_dict).items()}
-    #     losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-    
-    # if comm.is_main_process():
-    #     # loss logging with Neptune
-    #     run['metrics/total_test_loss'].log(losses_reduced)
+    if test_loss_data_loader is not None:
+        with torch.no_grad():
+            batches_no = 0
+            loss_sum = 0.0
+            for data in test_loss_data_loader:
+                loss_dict = model(data)
+                losses = sum(loss_dict.values())
+                assert torch.isfinite(losses).all(), loss_dict
+                
+                loss_dict_reduced = {"test_" + k: v.item()
+                                    for k, v in comm.reduce_dict(loss_dict).items()}
+                losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+                loss_sum += losses_reduced 
+                batches_no += 1
+            
+            avg_loss = loss_sum / batches_no
+
+            if comm.is_main_process():
+                # Test loss logging with Neptune
+                run['metrics/total_test_loss'].log(avg_loss)
     
     return results['segm']['AP']
 
@@ -144,6 +175,8 @@ def do_train_test(cfg, args):
 
     # ------ DATA LOADERS ------
 
+    dataset_name = dataset_name = cfg.DATASETS.TEST[0]
+
     # Define a sequence of augmentations:
     augs_list = [
         T.RandomFlip(prob=0.5, horizontal=True, vertical=False),
@@ -160,8 +193,10 @@ def do_train_test(cfg, args):
                                                                     use_instance_mask=True)
                                                 )
 
-    dataset_name = dataset_name = cfg.DATASETS.TEST[0]
     test_data_loader = build_detection_test_loader(cfg, dataset_name)
+
+    test_loss_data_loader = build_test_loss_loader(cfg)
+
     evaluator = get_evaluator(
         cfg, dataset_name, os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name)
     )
@@ -216,9 +251,14 @@ def do_train_test(cfg, args):
 
             loss_dict_reduced = {k: v.item() for k, v in comm.reduce_dict(loss_dict).items()}
             losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-            if comm.is_main_process():
-                # loss logging with Neptune
-                run['metrics/total_train_loss'].log(losses_reduced)
+            if (
+                cfg.TEST.EVAL_PERIOD > 0
+                and (iteration + 1) % cfg.TEST.EVAL_PERIOD == 0
+                and iteration != max_iter - 1
+            ):
+                if comm.is_main_process():
+                    # loss logging with Neptune
+                    run['metrics/total_train_loss'].log(losses_reduced)
 
             optimizer.zero_grad()
             losses.backward()
@@ -233,7 +273,7 @@ def do_train_test(cfg, args):
                 and (iteration + 1) % cfg.TEST.EVAL_PERIOD == 0
                 and iteration != max_iter - 1
             ):
-                do_test(model, test_data_loader, evaluator)
+                do_test(model, test_data_loader, evaluator, test_loss_data_loader)
                 comm.synchronize()
 
             periodic_checkpointer.step(iteration)    
