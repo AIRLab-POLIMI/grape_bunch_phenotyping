@@ -31,13 +31,9 @@ from detectron2.solver import WarmupParamScheduler, LRMultiplier
 # Logging metadata with Neptune
 import neptune.new as neptune
 
-# Hyperparameters optimization with Optuna
-import neptune.new.integrations.optuna as optuna_utils
-import optuna
-
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
-                       mode='async',        # use 'debug' to turn off logging
-                       name='test',
+                       mode='async',        # use 'debug' to turn off logging, 'async' otherwise
+                       name='freeze_at_0',
                        tags=[])
 
 
@@ -76,22 +72,26 @@ def get_evaluator(cfg, dataset_name, output_folder=None):
     return DatasetEvaluators(evaluator_list)
 
 
-def do_test(cfg, model):
-    results = OrderedDict()
-    for dataset_name in cfg.DATASETS.TEST:
-        data_loader = build_detection_test_loader(cfg, dataset_name)
-        evaluator = get_evaluator(
-            cfg, dataset_name, os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name)
-        )
-        results_i = inference_on_dataset(model, data_loader, evaluator)
-        results[dataset_name] = results_i
-        if comm.is_main_process():
-            logger.info("Evaluation results for {} in csv format:".format(dataset_name))
-            print_csv_format(results_i)
-            # AP50 logging with Neptune
-            # run['metrics/AP50_segm_test'].log(results_i['segm']['AP50'])
+def do_test(model, data_loader, evaluator):
+    results = inference_on_dataset(model, data_loader, evaluator)
+    if comm.is_main_process():
+        logger.info("Evaluation results for test dataset in csv format:")
+        print_csv_format(results)
+        # AP50 logging with Neptune
+        run['metrics/AP_segm_test'].log(results['segm']['AP'])
+
+    # for _ , inputs in enumerate(data_loader):
+    #     loss_dict = model(inputs)
+    #     losses = sum(loss_dict.values())
+    #     assert torch.isfinite(losses).all(), loss_dict
+    #     loss_dict_reduced = {k: v.item() for k, v in comm.reduce_dict(loss_dict).items()}
+    #     losses_reduced = sum(loss for loss in loss_dict_reduced.values())
     
-    return results[dataset_name]['segm']['AP50']
+    # if comm.is_main_process():
+    #     # loss logging with Neptune
+    #     run['metrics/total_test_loss'].log(losses_reduced)
+    
+    return results['segm']['AP']
 
 
 def get_dataset_dicts(cfg, split_name: str):
@@ -140,13 +140,31 @@ def setup(args):
     return cfg
 
 
-def objective(trial, cfg, args):
+def do_train_test(cfg, args):
 
-    # Define hyperparameters to tune with Optuna
-    cfg.SOLVER.BASE_LR = trial.suggest_float("base_lr", 1e-6, 0.5, log=True)  # If log is true, the value is sampled from the range in the log domain
-    cfg.MODEL.BACKBONE.FREEZE_AT = trial.suggest_categorical("freeze_at", [0, 1, 2, 3, 4, 5])
-    cfg.SOLVER.WARMUP_ITERS = trial.suggest_int("warmup_iters", 30, 90, step=10)
-    cfg.SOLVER.GAMMA = trial.suggest_float("gamma", 0.1, 0.9) 
+    # ------ DATA LOADERS ------
+
+    # Define a sequence of augmentations:
+    augs_list = [
+        T.RandomFlip(prob=0.5, horizontal=True, vertical=False),
+        T.RandomApply(T.RandomContrast(0.75, 1.25)),        # default probability of RandomApply is 0.5
+        T.RandomApply(T.RandomSaturation(0.75, 1.25)),
+        T.RandomApply(T.RandomBrightness(0.75, 1.25))
+    ]
+
+    train_data_loader = build_detection_train_loader(cfg,
+                                                mapper=DatasetMapper(cfg,
+                                                                    is_train=True,
+                                                                    augmentations=augs_list,
+                                                                    image_format=cfg.INPUT.FORMAT,
+                                                                    use_instance_mask=True)
+                                                )
+
+    dataset_name = dataset_name = cfg.DATASETS.TEST[0]
+    test_data_loader = build_detection_test_loader(cfg, dataset_name)
+    evaluator = get_evaluator(
+        cfg, dataset_name, os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name)
+    )
 
     # ------ MODEL ------
 
@@ -156,7 +174,7 @@ def objective(trial, cfg, args):
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
             cfg.MODEL.WEIGHTS, resume=args.resume
         )
-        return do_test(cfg, model)
+        return do_test(model, test_data_loader, evaluator)
 
     distributed = comm.get_world_size() > 1
     if distributed:
@@ -186,31 +204,12 @@ def objective(trial, cfg, args):
     max_iter = cfg.SOLVER.MAX_ITER
 
     periodic_checkpointer = PeriodicCheckpointer(
-        checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD, max_iter=max_iter  # by default is every 5000 iterations
+        checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD, max_iter=max_iter 
     )
 
-    # writers = default_writers(cfg.OUTPUT_DIR, max_iter) if comm.is_main_process() else []
-
-    # Define a sequence of augmentations:
-    augs_list = [
-        T.RandomFlip(prob=0.5, horizontal=True, vertical=False),
-        T.RandomApply(T.RandomContrast(0.75, 1.25)),        # default probability of RandomApply is 0.5
-        T.RandomApply(T.RandomSaturation(0.75, 1.25)),
-        T.RandomApply(T.RandomBrightness(0.75, 1.25))
-    ]
-
-    data_loader = build_detection_train_loader(cfg,
-                                                mapper=DatasetMapper(cfg,
-                                                                    is_train=True,
-                                                                    augmentations=augs_list,
-                                                                    image_format=cfg.INPUT.FORMAT,
-                                                                    use_instance_mask=True)
-                                                )
-
-    epoch = 0
     logger.info("Starting training from iteration {}".format(start_iter))
     with EventStorage(start_iter):
-        for data, iteration in zip(data_loader, range(start_iter, max_iter)):
+        for data, iteration in zip(train_data_loader, range(start_iter, max_iter)):
             loss_dict = model(data)
             losses = sum(loss_dict.values())
             assert torch.isfinite(losses).all(), loss_dict
@@ -219,13 +218,12 @@ def objective(trial, cfg, args):
             losses_reduced = sum(loss for loss in loss_dict_reduced.values())
             if comm.is_main_process():
                 # loss logging with Neptune
-                # run['metrics/total_train_loss'].log(losses_reduced)
-                pass
+                run['metrics/total_train_loss'].log(losses_reduced)
 
             optimizer.zero_grad()
             losses.backward()
             optimizer.step()
-            # run['scalars/lr'].log(optimizer.param_groups[0]["lr"])  # log learning rate with Neptune
+            run['scalars/lr'].log(optimizer.param_groups[0]["lr"])  # log learning rate with Neptune
             scheduler.step()
 
             # ------ TEST ------
@@ -235,22 +233,12 @@ def objective(trial, cfg, args):
                 and (iteration + 1) % cfg.TEST.EVAL_PERIOD == 0
                 and iteration != max_iter - 1
             ):
-                performance = do_test(cfg, model)
-                trial.report(performance, epoch)    # log perfomance after each epoch to enable pruning
-                # Handle pruning based on the intermediate value
-                if trial.should_prune():
-                    raise optuna.exceptions.TrialPruned()
-                epoch += 1
+                do_test(model, test_data_loader, evaluator)
                 comm.synchronize()
 
-            # if iteration - start_iter > 5 and (
-            #     (iteration + 1) % 20 == 0 or iteration == max_iter - 1
-            # ):
-            #     for writer in writers:
-            #         writer.write()
             periodic_checkpointer.step(iteration)    
 
-    return do_test(cfg, model)
+    return do_test(model, test_data_loader, evaluator)
 
 
 def main(args):
@@ -260,7 +248,7 @@ def main(args):
 
     # custom configurations
     dataset_cfg = get_dataset_cfg_defaults()
-    dataset_cfg.merge_from_file("./configs/dataset_train_cfg.yaml")
+    dataset_cfg.merge_from_file("./configs/dataset_test_cfg.yaml")
     dataset_cfg.freeze()
 
     # ------ NEPTUNE LOGGING ------
@@ -270,21 +258,21 @@ def main(args):
     PARAMS = {'dataset_train': cfg.DATASETS.TRAIN,
               'dataset_test': cfg.DATASETS.TEST,
               'dataloader_num_workers': cfg.DATALOADER.NUM_WORKERS,
-              # 'freeze_at': cfg.MODEL.BACKBONE.FREEZE_AT,
+              'freeze_at': cfg.MODEL.BACKBONE.FREEZE_AT,
               'batch_size_train': cfg.SOLVER.IMS_PER_BATCH,
               'max_iter': cfg.SOLVER.MAX_ITER,
-              # 'base_lr': cfg.SOLVER.BASE_LR,
+              'base_lr': cfg.SOLVER.BASE_LR,
               'momentum': cfg.SOLVER.MOMENTUM,
               'weight_decay': cfg.SOLVER.WEIGHT_DECAY,
               'gamma': cfg.SOLVER.GAMMA,
               'steps': cfg.SOLVER.STEPS,
               'warmup_factor': cfg.SOLVER.WARMUP_FACTOR,
-              # 'warmup_iters': cfg.SOLVER.WARMUP_ITERS,
+              'warmup_iters': cfg.SOLVER.WARMUP_ITERS,
               'eval_period': cfg.TEST.EVAL_PERIOD,
               'optimizer': 'SGD'}
 
     # Pass parameters to the Neptune run object.
-    run['parameters'] = PARAMS          # This will create a ‘parameters' directory containing the PARAMS dictionary
+    run['cfg_parameters'] = PARAMS          # This will create a ‘parameters' directory containing the PARAMS dictionary
 
     # ------ DATASETS ------
 
@@ -295,16 +283,7 @@ def main(args):
 
     # ------ TRAIN AND TEST WITH OPTUNA ------
 
-    # Create a NeptuneCallback for Optuna
-    neptune_callback = optuna_utils.NeptuneCallback(run)
-
-    # Pass NeptuneCallback to Optuna Study .optimize()
-    study = optuna.create_study(direction="maximize", study_name="lr_freeze_warmiters", storage='sqlite:///optuna-db/lr_freeze_warmiters.db')
-    study.optimize(functools.partial(objective, cfg=cfg, args=args),  # I use functools to create a new function with the additional arguments
-                   n_trials=1,            # The number of trials for each process
-                   timeout=None,            # Stop study after the given number of seconds
-                   n_jobs=1,               # The number of parallel jobs. If -1, the number is set to CPU count
-                   callbacks=[neptune_callback])
+    return do_train_test(cfg, args)
 
 
 if __name__ == "__main__":
