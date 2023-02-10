@@ -35,7 +35,7 @@ import neptune.new as neptune
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
-                       name='freeze_at_1',
+                       name='freeze_at_0',
                        tags=[])
 
 
@@ -88,7 +88,7 @@ def build_test_loss_loader(cfg):
     return build_detection_train_loader(dataset=dataset,
                                         mapper=mapper,
                                         sampler=test_sampler,
-                                        total_batch_size=1,
+                                        total_batch_size=len(dataset),
                                         aspect_ratio_grouping=cfg.DATALOADER.ASPECT_RATIO_GROUPING,
                                         num_workers=cfg.DATALOADER.NUM_WORKERS)
 
