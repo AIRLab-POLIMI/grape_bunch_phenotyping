@@ -1,14 +1,15 @@
 import logging
-import functools
 import os
 from configs.dataset_cfg import get_dataset_cfg_defaults
 import torch
 import detectron2
-from detectron2.engine import default_argument_parser, default_setup, launch, default_writers
+from detectron2.engine import default_argument_parser, default_setup, launch
 from detectron2.config import get_cfg
 from detectron2.data import DatasetCatalog, MetadataCatalog
 from detectron2.data.datasets import load_coco_json
 from detectron2.data import transforms as T
+import albumentations as A
+from albumentations_wrapper import AlbumentationsWrapper
 from detectron2.data import DatasetMapper   # the default mapper
 from detectron2.data import build_detection_train_loader, build_detection_test_loader
 from detectron2.data import get_detection_dataset_dicts
@@ -17,9 +18,8 @@ from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer, PeriodicCheckpointer
 import detectron2.utils.comm as comm
 from torch.nn.parallel import DistributedDataParallel
-from detectron2.solver import build_optimizer, build_lr_scheduler
+from detectron2.solver import build_optimizer
 from detectron2.utils.events import EventStorage
-from collections import OrderedDict
 from detectron2.evaluation import inference_on_dataset, print_csv_format, DatasetEvaluators, COCOEvaluator
 from fvcore.common.param_scheduler import ExponentialParamScheduler
 from detectron2.config import CfgNode
@@ -35,7 +35,7 @@ import neptune.new as neptune
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
-                       name='freeze_at_0',
+                       name='freeze_at_0_resizing_augmentations',
                        tags=[])
 
 
@@ -100,6 +100,7 @@ def do_test(model, test_data_loader, evaluator, test_loss_data_loader=None):
         print_csv_format(results)
         # AP logging with Neptune
         run['metrics/AP_segm_test'].log(results['segm']['AP'])
+        run['metrics/AP50_segm_test'].log(results['segm']['AP50'])
 
     if test_loss_data_loader is not None:
         with torch.no_grad():
@@ -179,10 +180,13 @@ def do_train_test(cfg, args):
 
     # Define a sequence of augmentations:
     augs_list = [
+        AlbumentationsWrapper(A.GaussianBlur(blur_limit=(3, 7), sigma_limit=0, always_apply=False, p=0.33)),
+        AlbumentationsWrapper(A.GaussNoise(var_limit=(10, 50), mean=0, per_channel=True, always_apply=False, p=0.33)),
+        AlbumentationsWrapper(A.PixelDropout(dropout_prob=0.01, per_channel=False, p=0.5)),
         T.RandomFlip(prob=0.5, horizontal=True, vertical=False),
-        T.RandomApply(T.RandomContrast(0.75, 1.25)),        # default probability of RandomApply is 0.5
-        T.RandomApply(T.RandomSaturation(0.75, 1.25)),
-        T.RandomApply(T.RandomBrightness(0.75, 1.25))
+        T.RandomContrast(0.75, 1.25),        # default probability of RandomApply is 0.5 T.RandomApply()
+        T.RandomSaturation(0.75, 1.25),
+        T.RandomBrightness(0.75, 1.25)
     ]
 
     train_data_loader = build_detection_train_loader(cfg,
