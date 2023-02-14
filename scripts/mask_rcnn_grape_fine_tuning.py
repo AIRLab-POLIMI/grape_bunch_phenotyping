@@ -280,7 +280,7 @@ def do_train_test(cfg, args):
                 do_test(model, test_data_loader, evaluator, test_loss_data_loader)
                 comm.synchronize()
 
-            periodic_checkpointer.step(iteration)    
+            periodic_checkpointer.step(iteration)
 
     return do_test(model, test_data_loader, evaluator)
 
@@ -292,7 +292,10 @@ def main(args):
 
     # custom configurations
     dataset_cfg = get_dataset_cfg_defaults()
-    dataset_cfg.merge_from_file("./configs/dataset_test_cfg.yaml")
+    if args.eval_only:
+        dataset_cfg.merge_from_file("./configs/dataset_test_cfg.yaml")
+    else:
+        dataset_cfg.merge_from_file("./configs/dataset_train_cfg.yaml")
     dataset_cfg.freeze()
 
     # ------ NEPTUNE LOGGING ------
@@ -325,7 +328,7 @@ def main(args):
                                 lambda: get_dataset_dicts(dataset_cfg, split_name))           # register the dataset
         MetadataCatalog.get(dataset_cfg.DATASET.NAME+"_"+split_name).thing_colors = [(255, 0, 0)]              # add color metadata for bunches
 
-    # ------ TRAIN AND TEST WITH OPTUNA ------
+    # ------ TRAIN AND TEST ------
 
     return do_train_test(cfg, args)
 
