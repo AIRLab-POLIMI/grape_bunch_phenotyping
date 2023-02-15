@@ -1,64 +1,46 @@
-import sys
-import os
 import fiftyone as fo
-import json
+import fiftyone.utils.coco as fouc
+import argparse
 
 
-def main(argv):
-    print(argv)
+def main(args):
 
-    if len(argv) == 1 or len(argv) == 2:
-        annotation_file_path = argv[0]
+    images_dir_path = args.imgs_dir
+    pred_file_path = args.pred_json
+    gt_file_path = args.gt_json
 
-        if os.path.isfile(annotation_file_path):
-            # reading the JSON file and updating it by norming the image paths; otherwise Fifty One cannot deal with them
-            with open(annotation_file_path, 'r') as file:
-                updated_annotations = json.load(file)
+    # Create a FiftyOne dataset from the JSON dictionary
+    coco_dataset = fo.Dataset.from_dir(
+        dataset_type=fo.types.COCODetectionDataset,
+        data_path=images_dir_path,
+        labels_path=gt_file_path,
+        include_id=True,
+        label_field="ground_truth",
+    )
 
-            # Update the values for the specified key
-            for image in updated_annotations["images"]:
-                if "file_name" in image:
-                    image["file_name"] = os.path.normpath(image["file_name"])
+    classes = coco_dataset.default_classes
+    # And add model predictions
+    fouc.add_coco_labels(
+        coco_dataset,
+        "predictions",
+        pred_file_path,
+        classes,
+        label_type='segmentations',
+        coco_id_field="ground_truth_coco_id",
+    )
 
-            # Write the modified data to a new file; note that this new file needs to be in the same location as the original annotation file,
-            # otherwise, the relative paths to the images in the annotations will not be correct anymore
-            dir_name = os.path.dirname(annotation_file_path)
-            tmp_updated_annotations_path = os.path.join(dir_name, "tmp.json")
-            with open(tmp_updated_annotations_path, "w") as file:
-                json.dump(updated_annotations, file)
+    # Launch the view in a web interface
+    session = fo.launch_app(coco_dataset)
 
-            if len(argv) == 1:
-                # load the data and the annotations into a Fifty One dataset; data paths are relative to the directory that the annotation file is in
-                coco_dataset = fo.Dataset.from_dir(
-                    dataset_type=fo.types.COCODetectionDataset,
-                    data_path=dir_name,
-                    labels_path=tmp_updated_annotations_path,
-                    include_id=True
-                )
-            else:
-                # load the data and the annotations into a Fifty One dataset; data paths are relative to the directory passed as an argument
-                coco_dataset = fo.Dataset.from_dir(
-                    dataset_type=fo.types.COCODetectionDataset,
-                    data_path=argv[1],
-                    labels_path=tmp_updated_annotations_path,
-                    include_id=True
-                )
-
-            # starting a fiftyone session in a separate window to inspect the annotations
-            session = fo.launch_app(coco_dataset)
-
-            # waiting for the user to be done, then cleaning up
-            input("Press enter when you're done inspecting the data:\n")
-            session.close()
-            os.remove(tmp_updated_annotations_path)
-
-        else:
-            print(f"The given path {annotation_file_path} does not lead to a file.")
-            return 
-    else:
-        print(f"Expected one or two arguments, but {len(argv)} were given.")
-        return
+    # waiting for the user to be done, then cleaning up
+    input("Press enter when you're done inspecting the data:\n")
+    session.close()
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("imgs_dir", help="path of the images directory", type=str)
+    parser.add_argument("pred_json", help="path of the predictions JSON file in COCO format", type=str)
+    parser.add_argument("gt_json", help="path of the ground truth JSON file in COCO format", type=str)
+    args = parser.parse_args()
+    main(args)
