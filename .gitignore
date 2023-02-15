@@ -1,6 +1,6 @@
 # AIRLab server docker stuff
 .runconfigs
-docker_run.txt
+commands.txt
 
 # Optuna
 optuna-db
