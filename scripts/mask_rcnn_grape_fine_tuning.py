@@ -35,8 +35,8 @@ import neptune.new as neptune
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
-                       name='freeze_at_0_resizing_augmentations',
-                       tags=[])
+                       name='mask_rcnn_R_101_FPN_3x_training',
+                       tags=['resizing', 'augms', 'random_apply_augms'])
 
 
 logger = logging.getLogger("detectron2")
@@ -180,13 +180,13 @@ def do_train_test(cfg, args):
 
     # Define a sequence of augmentations:
     augs_list = [
-        AlbumentationsWrapper(A.GaussianBlur(blur_limit=(3, 7), sigma_limit=0, always_apply=False, p=0.33)),
-        AlbumentationsWrapper(A.GaussNoise(var_limit=(10, 50), mean=0, per_channel=True, always_apply=False, p=0.33)),
+        AlbumentationsWrapper(A.GaussianBlur(blur_limit=(3, 7), sigma_limit=0, always_apply=False, p=0.5)),
+        AlbumentationsWrapper(A.GaussNoise(var_limit=(10, 50), mean=0, per_channel=True, always_apply=False, p=0.5)),
         AlbumentationsWrapper(A.PixelDropout(dropout_prob=0.01, per_channel=False, p=0.5)),
         T.RandomFlip(prob=0.5, horizontal=True, vertical=False),
-        T.RandomContrast(0.75, 1.25),        # default probability of RandomApply is 0.5 T.RandomApply()
-        T.RandomSaturation(0.75, 1.25),
-        T.RandomBrightness(0.75, 1.25)
+        T.RandomApply(T.RandomContrast(0.75, 1.25)),        # default probability of RandomApply is 0.5 
+        T.RandomApply(T.RandomSaturation(0.75, 1.25)),
+        T.RandomApply(T.RandomBrightness(0.75, 1.25))
     ]
 
     train_data_loader = build_detection_train_loader(cfg,
