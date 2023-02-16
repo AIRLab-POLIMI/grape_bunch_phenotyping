@@ -1,3 +1,8 @@
+"""
+This script takes as input COCO annotations in json format and
+shows them in your browser through FiftyOne. You can visualize
+both predictions and ground truth annotations. 
+"""
 import fiftyone as fo
 import fiftyone.utils.coco as fouc
 import argparse
