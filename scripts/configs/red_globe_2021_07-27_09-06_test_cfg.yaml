@@ -2,6 +2,6 @@ _BASE_: "red_globe_2021_07-27_09-06_train_cfg.yaml"
 MODEL:
   WEIGHTS: "output/model_final.pth"
   ROI_HEADS:
-    SCORE_THRESH_TEST: 0.05       # Minimum score threshold (assuming scores in a [0, 1] range)
+    SCORE_THRESH_TEST: 0.70       # Minimum score threshold (assuming scores in a [0, 1] range)
 INPUT:
-  MIN_SIZE_TEST: 720              # Set to zero to disable resize in testing
+  MIN_SIZE_TEST: 0                # Set to zero to disable resize in testing

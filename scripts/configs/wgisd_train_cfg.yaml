@@ -1,4 +1,4 @@
-_BASE_: "scratch_mask_rcnn_R_50_FPN_9x_gn.yaml"   # _BASE_: "mask_rcnn_R_101_FPN_3x.yaml"
+_BASE_: "mask_rcnn_R_101_FPN_3x.yaml"
 MODEL:
   ROI_HEADS:
     NUM_CLASSES: 1                # only has one class (bunch)
@@ -8,10 +8,10 @@ MODEL:
   BACKBONE:
     FREEZE_AT: 0                  # default value is 2
 DATASETS:
-  TRAIN: ("red_globe_2021_07-27_09-06_TRAIN",)
-  TEST: ("red_globe_2021_07-27_09-06_TEST",)
+  TRAIN: ("wgisd_TRAIN",)  
+  TEST: ("wgisd_TEST",)   
 INPUT:
-  MIN_SIZE_TRAIN: (720,)          # use (480, 720) to disable resizing
+  MIN_SIZE_TRAIN: (1536,)          
   MIN_SIZE_TEST: 0                # Set to zero to disable resize in testing
 DATALOADER:
   NUM_WORKERS: 2                  # When the dataset is small, it is suggested to set the NUM_WORKERS to 0 (from PyTorch documentation)
@@ -24,4 +24,4 @@ SOLVER:
   GAMMA: 0.5                      # It is used to control the learning rate decay over time
   CHECKPOINT_PERIOD: 100000       # A model checkpoint will be saved if iteration is a multiple of period 
 TEST:
-  EVAL_PERIOD: 24                 # 1 evaluation each epoch (with 2 imgs per batch). The period (in terms of steps) to evaluate the model during training
+  EVAL_PERIOD: 220                 # 1 evaluation every 4 epochs (with 2 imgs per batch). The period (in terms of steps) to evaluate the model during training
