@@ -35,8 +35,8 @@ import neptune.new as neptune
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
-                       name='mask_rcnn_R_101_FPN_3x_training',
-                       tags=['resizing', 'augms', 'random_apply_augms'])
+                       name='scratch_mask_rcnn_R_50_FPN_9x_gn_training',
+                       tags=['WGISD', 'official_AP_impl', 'resizing', 'augms', 'random_apply_augms', 'freezeat_0'])
 
 
 logger = logging.getLogger("detectron2")
@@ -61,9 +61,9 @@ def get_evaluator(cfg, dataset_name, output_folder=None):
     # )
     evaluator_list.append(COCOEvaluator(dataset_name,
                                         output_dir=output_folder,
-                                        allow_cached_coco=False,    # our dataset is small, so we do not need caching
-                                        use_fast_impl=True))        # use a fast but unofficial implementation to compute AP.
-                                                                    # compute results with the official API for use in papers
+                                        allow_cached_coco=False,        # our dataset is small, so we do not need caching
+                                        use_fast_impl=False))           # use a fast but unofficial implementation to compute AP.
+                                                                        # compute results with the official API for use in papers
 
     if len(evaluator_list) == 0:
         raise NotImplementedError(
@@ -88,7 +88,7 @@ def build_test_loss_loader(cfg):
     return build_detection_train_loader(dataset=dataset,
                                         mapper=mapper,
                                         sampler=test_sampler,
-                                        total_batch_size=len(dataset),
+                                        total_batch_size=9, # len(dataset)
                                         aspect_ratio_grouping=cfg.DATALOADER.ASPECT_RATIO_GROUPING,
                                         num_workers=cfg.DATALOADER.NUM_WORKERS)
 
@@ -316,7 +316,10 @@ def main(args):
               'warmup_factor': cfg.SOLVER.WARMUP_FACTOR,
               'warmup_iters': cfg.SOLVER.WARMUP_ITERS,
               'eval_period': cfg.TEST.EVAL_PERIOD,
-              'optimizer': 'SGD'}
+              'optimizer': 'SGD',
+              'min_size_train': cfg.INPUT.MIN_SIZE_TRAIN,
+              'min_size_test': cfg.INPUT.MIN_SIZE_TEST
+              }
 
     # Pass parameters to the Neptune run object.
     run['cfg_parameters'] = PARAMS          # This will create a ‘parameters' directory containing the PARAMS dictionary
