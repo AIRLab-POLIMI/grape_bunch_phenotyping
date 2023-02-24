@@ -36,7 +36,7 @@ import neptune.new as neptune
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
                        name='scratch_mask_rcnn_R_50_FPN_9x_gn_training',
-                       tags=['WGISD', 'official_AP_impl', 'WGISD_paper_resizing', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
+                       tags=['official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
 
 
 logger = logging.getLogger("detectron2")
@@ -186,7 +186,8 @@ def do_train_test(cfg, args):
         T.RandomApply(T.RandomContrast(0.75, 1.25)),            # default probability of RandomApply is 0.5 
         T.RandomApply(T.RandomSaturation(0.75, 1.25)),
         T.RandomApply(T.RandomBrightness(0.75, 1.25)),
-        T.Resize((1024, 1024))                                  # fixed resize for all images. Shape is a tuple (h, w)
+        # T.Resize((720, 1280))                                  # fixed resize for all images. Shape is a tuple (h, w)
+        T.ResizeShortestEdge(cfg.INPUT.MIN_SIZE_TRAIN, cfg.INPUT.MAX_SIZE_TRAIN, cfg.INPUT.MIN_SIZE_TRAIN_SAMPLING)
     ]
 
     train_mapper = DatasetMapper(cfg,
