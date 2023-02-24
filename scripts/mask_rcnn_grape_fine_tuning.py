@@ -36,7 +36,7 @@ import neptune.new as neptune
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
                        name='scratch_mask_rcnn_R_50_FPN_9x_gn_training',
-                       tags=['WGISD', 'official_AP_impl', 'resizing', 'augms', 'random_apply_augms', 'freezeat_0'])
+                       tags=['WGISD', 'official_AP_impl', 'WGISD_paper_resizing', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
 
 
 logger = logging.getLogger("detectron2")
@@ -74,7 +74,7 @@ def get_evaluator(cfg, dataset_name, output_folder=None):
     return DatasetEvaluators(evaluator_list)
 
 
-def build_test_loss_loader(cfg):
+def build_val_loss_loader(cfg, train_mapper):
     dataset = get_detection_dataset_dicts(
             cfg.DATASETS.TEST,
             filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS,
@@ -83,17 +83,16 @@ def build_test_loss_loader(cfg):
             else 0,
             proposal_files=cfg.DATASETS.PROPOSAL_FILES_TRAIN if cfg.MODEL.LOAD_PROPOSALS else None,
         )
-    mapper = DatasetMapper(cfg, True)
     test_sampler = InferenceSampler(len(dataset))
     return build_detection_train_loader(dataset=dataset,
-                                        mapper=mapper,
+                                        mapper=train_mapper,
                                         sampler=test_sampler,
-                                        total_batch_size=9, # len(dataset)
+                                        total_batch_size=len(dataset),
                                         aspect_ratio_grouping=cfg.DATALOADER.ASPECT_RATIO_GROUPING,
                                         num_workers=cfg.DATALOADER.NUM_WORKERS)
 
 
-def do_test(model, test_data_loader, evaluator, test_loss_data_loader=None):
+def do_test(model, test_data_loader, evaluator, val_loss_data_loader=None):
     results = inference_on_dataset(model, test_data_loader, evaluator)
     if comm.is_main_process():
         logger.info("Evaluation results for test dataset in csv format:")
@@ -102,11 +101,11 @@ def do_test(model, test_data_loader, evaluator, test_loss_data_loader=None):
         run['metrics/AP_segm_test'].log(results['segm']['AP'])
         run['metrics/AP50_segm_test'].log(results['segm']['AP50'])
 
-    if test_loss_data_loader is not None:
+    if val_loss_data_loader is not None:
         with torch.no_grad():
             batches_no = 0
             loss_sum = 0.0
-            for data in test_loss_data_loader:
+            for data in val_loss_data_loader:
                 loss_dict = model(data)
                 losses = sum(loss_dict.values())
                 assert torch.isfinite(losses).all(), loss_dict
@@ -184,22 +183,23 @@ def do_train_test(cfg, args):
         AlbumentationsWrapper(A.GaussNoise(var_limit=(10, 50), mean=0, per_channel=True, always_apply=False, p=0.5)),
         AlbumentationsWrapper(A.PixelDropout(dropout_prob=0.01, per_channel=False, p=0.5)),
         T.RandomFlip(prob=0.5, horizontal=True, vertical=False),
-        T.RandomApply(T.RandomContrast(0.75, 1.25)),        # default probability of RandomApply is 0.5 
+        T.RandomApply(T.RandomContrast(0.75, 1.25)),            # default probability of RandomApply is 0.5 
         T.RandomApply(T.RandomSaturation(0.75, 1.25)),
-        T.RandomApply(T.RandomBrightness(0.75, 1.25))
+        T.RandomApply(T.RandomBrightness(0.75, 1.25)),
+        T.Resize((1024, 1024))                                  # fixed resize for all images. Shape is a tuple (h, w)
     ]
 
-    train_data_loader = build_detection_train_loader(cfg,
-                                                mapper=DatasetMapper(cfg,
-                                                                    is_train=True,
-                                                                    augmentations=augs_list,
-                                                                    image_format=cfg.INPUT.FORMAT,
-                                                                    use_instance_mask=True)
-                                                )
+    train_mapper = DatasetMapper(cfg,
+                                 is_train=True,
+                                 augmentations=augs_list, # it overwites the default train augmentations (ResizeShortestEdge and flipping)
+                                 image_format=cfg.INPUT.FORMAT,
+                                 use_instance_mask=True)
 
-    test_data_loader = build_detection_test_loader(cfg, dataset_name)
+    train_data_loader = build_detection_train_loader(cfg, mapper=train_mapper)
 
-    test_loss_data_loader = build_test_loss_loader(cfg)
+    test_data_loader = build_detection_test_loader(cfg, dataset_name)   # default test augmentations (ResizeShortestEdge)
+
+    val_loss_data_loader = build_val_loss_loader(cfg, train_mapper)
 
     evaluator = get_evaluator(
         cfg, dataset_name, os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name)
@@ -277,7 +277,7 @@ def do_train_test(cfg, args):
                 and (iteration + 1) % cfg.TEST.EVAL_PERIOD == 0
                 and iteration != max_iter - 1
             ):
-                do_test(model, test_data_loader, evaluator, test_loss_data_loader)
+                do_test(model, test_data_loader, evaluator, val_loss_data_loader)
                 comm.synchronize()
 
             periodic_checkpointer.step(iteration)
@@ -328,8 +328,8 @@ def main(args):
 
     for split_name in ['TRAIN', 'TEST']:
         DatasetCatalog.register(dataset_cfg.DATASET.NAME+"_"+split_name,
-                                lambda: get_dataset_dicts(dataset_cfg, split_name))           # register the dataset
-        MetadataCatalog.get(dataset_cfg.DATASET.NAME+"_"+split_name).thing_colors = [(255, 0, 0)]              # add color metadata for bunches
+                                lambda: get_dataset_dicts(dataset_cfg, split_name))                     # register the dataset
+        MetadataCatalog.get(dataset_cfg.DATASET.NAME+"_"+split_name).thing_colors = [(255, 0, 0)]       # add color metadata for bunches
 
     # ------ TRAIN AND TEST ------
 
