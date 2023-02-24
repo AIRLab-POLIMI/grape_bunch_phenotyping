@@ -1,4 +1,4 @@
-_BASE_: "mask_rcnn_R_101_FPN_3x.yaml"
+_BASE_: "scratch_mask_rcnn_R_50_FPN_9x_gn.yaml"   # _BASE_: "mask_rcnn_R_101_FPN_3x.yaml"
 MODEL:
   ROI_HEADS:
     NUM_CLASSES: 1                # only has one class (bunch)
@@ -18,7 +18,7 @@ DATALOADER:
 SOLVER:
   IMS_PER_BATCH: 2                # This is the real "batch size" commonly known to deep learning people
   BASE_LR: 0.01                   # possible values: 0.00025                
-  MAX_ITER: 19200                 # 48 train images -> 24 batches * 100 epochs = 2400 iterations
+  MAX_ITER: 19200                 # 110 train images -> 55 batches * 100 epochs = 5500 iterations
   STEPS: [1920, 2160]             # decay learning rate at (0.8 * MAX_ITER) and (0.9 * MAX_ITER) -> only used with the STEP lr scheduler
   WARMUP_ITERS: 70                # 2.5% of MAX_ITER  
   GAMMA: 0.5                      # It is used to control the learning rate decay over time

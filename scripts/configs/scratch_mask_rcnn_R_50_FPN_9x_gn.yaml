@@ -1,7 +1,7 @@
 _BASE_: "mask_rcnn_R_50_FPN_3x_gn.yaml"
 MODEL:
   # PIXEL_STD: [57.375, 57.12, 58.395]
-  WEIGHTS: "../../weights/Scratch_R-50.pkl"
+  WEIGHTS: "../weights/Scratch_R-50.pkl"
   MASK_ON: True
   RESNETS:
     STRIDE_IN_1X1: False
