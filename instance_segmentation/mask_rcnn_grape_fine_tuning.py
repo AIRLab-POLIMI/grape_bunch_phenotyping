@@ -36,7 +36,7 @@ import neptune.new as neptune
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
                        name='scratch_mask_rcnn_R_50_FPN_9x_gn_training',
-                       tags=['val_loss_log_fix', 'official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
+                       tags=['official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
 
 
 logger = logging.getLogger("detectron2")
@@ -101,8 +101,13 @@ def do_test(model, test_data_loader, evaluator, val_loss_data_loader=None):
         run['metrics/AP_segm_test'].log(results['segm']['AP'])
         run['metrics/AP50_segm_test'].log(results['segm']['AP50'])
 
-    training_mode = model.training
-    model.eval()                    # we call the model.eval() method to set the dropout and batch normalization layers to evaluation mode
+    # we should call the model.eval() method to set the dropout and batch
+    # normalization layers to evaluation mode. However, in eval mode, the
+    # model return predictions instead of the loss dictionary. Also, to
+    # have the val loss comparable with the training loss we can leave
+    # the model in training mode (?)
+    # training_mode = model.training
+    # model.eval()                    
     if val_loss_data_loader is not None:
         with torch.no_grad():
             batches_no = 0
@@ -123,7 +128,7 @@ def do_test(model, test_data_loader, evaluator, val_loss_data_loader=None):
             if comm.is_main_process():
                 # Test loss logging with Neptune
                 run['metrics/total_test_loss'].log(avg_loss)
-    model.train(training_mode)
+    # model.train(training_mode)
     
     return results['segm']['AP']
 
@@ -189,7 +194,7 @@ def do_train_test(cfg, args):
         T.RandomApply(T.RandomContrast(0.75, 1.25)),            # default probability of RandomApply is 0.5 
         T.RandomApply(T.RandomSaturation(0.75, 1.25)),
         T.RandomApply(T.RandomBrightness(0.75, 1.25)),
-        # T.Resize((720, 1280))                                  # fixed resize for all images. Shape is a tuple (h, w)
+        # T.Resize((1024, 1024))                                  # fixed resize for all images. Shape is a tuple (h, w)
         T.ResizeShortestEdge(cfg.INPUT.MIN_SIZE_TRAIN, cfg.INPUT.MAX_SIZE_TRAIN, cfg.INPUT.MIN_SIZE_TRAIN_SAMPLING)
     ]
 
