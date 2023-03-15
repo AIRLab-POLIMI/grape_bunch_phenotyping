@@ -65,6 +65,7 @@ class GrapeBunchesDataset(Dataset):
     def __getitem__(self, idx):
 
         ann = self.img_labels[idx]
+        # TODO: Min Max scaling of the output!!!
         label = ann['attributes']['volume']
 
         img_id = ann['image_id']
@@ -167,8 +168,7 @@ def train(dataloader, model, loss_fn, optimizer):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-        if batch % 100 == 0:
+        if batch % 4 == 0:
             loss, current = loss.item(), (batch + 1) * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
@@ -177,17 +177,22 @@ def train(dataloader, model, loss_fn, optimizer):
 def test(dataloader, model, loss_fn):
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
-    model.eval() # we call the model.eval() method before inferencing to set the dropout and batch normalization layers to evaluation mode.
+    training_mode = model.training
+    # call model.eval() method before inferencing to set the dropout and batch
+    # normalization layers to evaluation mode
+    model.eval()
     test_loss, correct = 0, 0
     with torch.no_grad():
         for X, y in dataloader:
-            X, y = X.to(device), y.to(device)
+            X, y = X.to(device), y.to(device, torch.float32)
+            y = y.unsqueeze(1)
             pred = model(X)
             test_loss += loss_fn(pred, y).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
     test_loss /= num_batches
     correct /= size
     print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    model.train(training_mode)
 
 
 if __name__ == '__main__':
