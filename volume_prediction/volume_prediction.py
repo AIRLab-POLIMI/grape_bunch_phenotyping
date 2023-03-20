@@ -11,11 +11,16 @@ import torchvision.transforms as T
 import json
 import math
 import matplotlib.pyplot as plt
+from pycocotools import mask as maskUtils
+import numpy as np
 
 
 class GrapeBunchesDataset(Dataset):
     
-    def __init__(self, annotations_file, img_dir, img_size, crop_size, apply_mask=False, transform=None, target_transform=None, target_scaling=None):
+    def __init__(self, annotations_file, img_dir, img_size, crop_size,
+                 apply_mask=False, transform=None, target_transform=None,
+                 target_scaling=None):
+        
         with open(annotations_file) as dictionary_file:
             json_dictionary = json.load(dictionary_file)
         
@@ -92,7 +97,17 @@ class GrapeBunchesDataset(Dataset):
 
         # apply segmentation mask if required
         if self.apply_mask:
-            pass                            # TODO: implement masking
+            segmentation_mask = ann['segmentation']
+            # create a binary mask where the pixels inside the segmentation
+            # mask are 1 and the pixels outside the mask are 0
+            rles = maskUtils.frPyObjects(segmentation_mask, img_size[0], img_size[1])
+            rle = maskUtils.merge(rles)
+            mask = maskUtils.decode(rle)
+            mask = np.array(mask, dtype=np.float32)
+            # convert the mask to a Torch tensor
+            mask = torch.from_numpy(mask)
+            # apply the mask to the image
+            image = image * mask
 
         # resize the image if needed
         if self.fixed_img_size[0] != img_size[0] or self.fixed_img_size[1] != img_size[1]:
@@ -211,7 +226,8 @@ if __name__ == '__main__':
 
     transform = T.ConvertImageDtype(torch.float32)
     dataset = GrapeBunchesDataset(json_file, img_dir, (1280, 720), (275, 145),
-                                  transform=transform, target_scaling=(0.0, 1080.0))
+                                  apply_mask=True, transform=transform,
+                                  target_scaling=(0.0, 1080.0))
 
     # Create data loaders
     batch_size = 4
