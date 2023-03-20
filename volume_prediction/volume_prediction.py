@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 class GrapeBunchesDataset(Dataset):
     
-    def __init__(self, annotations_file, img_dir, img_size, crop_size, apply_mask=False, transform=None, target_transform=None):
+    def __init__(self, annotations_file, img_dir, img_size, crop_size, apply_mask=False, transform=None, target_transform=None, target_scaling=None):
         with open(annotations_file) as dictionary_file:
             json_dictionary = json.load(dictionary_file)
         
@@ -26,6 +26,7 @@ class GrapeBunchesDataset(Dataset):
         self.apply_mask = apply_mask        # whether to isolate the single bunch with its mask
         self.transform = transform
         self.target_transform = target_transform
+        self.target_scaling = target_scaling
 
         filtered_ann = []
         img_id = 0
@@ -64,9 +65,12 @@ class GrapeBunchesDataset(Dataset):
 
     def __getitem__(self, idx):
 
-        ann = self.img_labels[idx]
-        # TODO: Min Max scaling of the output!!!
+        ann = self.img_labels[idx]            
         label = ann['attributes']['volume']
+        if self.target_scaling:
+            min = self.target_scaling[0]
+            max = self.target_scaling[1]
+            label = (label - min) / (max - min)
 
         img_id = ann['image_id']
         img_filename = []
@@ -207,7 +211,7 @@ if __name__ == '__main__':
 
     transform = T.ConvertImageDtype(torch.float32)
     dataset = GrapeBunchesDataset(json_file, img_dir, (1280, 720), (275, 145),
-                                  transform=transform)
+                                  transform=transform, target_scaling=(0.0, 1080.0))
 
     # Create data loaders
     batch_size = 4
