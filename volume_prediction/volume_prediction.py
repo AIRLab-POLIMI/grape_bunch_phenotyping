@@ -1,4 +1,3 @@
-import argparse
 import os
 import torch
 from torch.utils.data import Dataset
@@ -13,6 +12,17 @@ import math
 import matplotlib.pyplot as plt
 from pycocotools import mask as maskUtils
 import numpy as np
+from configs.base_cfg import get_base_cfg_defaults
+from torcheval.metrics import R2Score
+from torcheval.metrics import MeanSquaredError
+
+# Logging metadata with Neptune
+import neptune.new as neptune
+
+run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
+                       mode='async',        # use 'debug' to turn off logging, 'async' otherwise
+                       name='CNNRegressor',
+                       tags=[])
 
 
 class GrapeBunchesDataset(Dataset):
@@ -172,7 +182,9 @@ class CNNRegressor(nn.Module):
 
 
 # Training loop
-def train(dataloader, model, loss_fn, optimizer):
+def train(dataloader, model, loss_fn, optimizer, device):
+    r2score_metric = R2Score(device=device)
+    mse_metric = MeanSquaredError(device=device)
     size = len(dataloader.dataset)
     model.train()
     for batch, (X, y) in enumerate(dataloader):
@@ -183,63 +195,109 @@ def train(dataloader, model, loss_fn, optimizer):
         pred = model(X)
         loss = loss_fn(pred, y)
 
+        # Compute metrics
+        r2score_metric.update(pred, y)
+        r2 = r2score_metric.compute()
+        mse_metric.update(pred, y)
+        mse = mse_metric.compute()
+
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
         if batch % 4 == 0:
             loss, current = loss.item(), (batch + 1) * len(X)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            print(f"Train error: R2: {r2:>7f}, MSE: {mse:>7f}, loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+
+    return r2, mse, loss
 
 
-# Check test accuracy 
-def test(dataloader, model, loss_fn):
-    size = len(dataloader.dataset)
+# Check test accuracy
+def test(dataloader, model, loss_fn, device):
+    r2score_metric = R2Score(device=device)
+    mse_metric = MeanSquaredError(device=device)
     num_batches = len(dataloader)
     training_mode = model.training
     # call model.eval() method before inferencing to set the dropout and batch
     # normalization layers to evaluation mode
     model.eval()
-    test_loss, correct = 0, 0
+    test_loss = 0
     with torch.no_grad():
         for X, y in dataloader:
             X, y = X.to(device), y.to(device, torch.float32)
             y = y.unsqueeze(1)
             pred = model(X)
             test_loss += loss_fn(pred, y).item()
-            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+            r2score_metric.update(pred, y)
+            r2 = r2score_metric.compute()
+            mse_metric.update(pred, y)
+            mse = mse_metric.compute()
     test_loss /= num_batches
-    correct /= size
-    print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    print(f"Test Error: \n R2: {r2:>7f}, MSE: {mse:>7f}, Avg loss: {test_loss:>7f} \n")
     model.train(training_mode)
 
+    return r2, mse, test_loss
 
-if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("json_file", type=str, help="path of the json file containing annotations")
-    parser.add_argument("img_dir", type=str, help="path of the images directory")
-    args = vars(parser.parse_args())
+def main():
+    # custom configurations
+    cfg = get_base_cfg_defaults()
+    # if args.eval_only:
+    #     cfg.merge_from_file("./configs/base_test_cfg.yaml")
+    # else:
+    #     cfg.merge_from_file("./configs/base_train_cfg.yaml")
+    cfg.merge_from_file("./configs/base_train_cfg.yaml")
+    cfg.freeze()
 
-    json_file = args["json_file"]
-    img_dir = args["img_dir"]
+    # Log parameters in Neptune
+    PARAMS = {'image_size': cfg.DATASET.IMAGE_SIZE,
+              'crop_size': cfg.DATASET.CROP_SIZE,
+              'masking': cfg.DATASET.MASKING,
+              'target_scaling': cfg.DATASET.TARGET_SCALING,
+              'epochs': cfg.SOLVER.EPOCHS,
+              'base_lr': cfg.SOLVER.BASE_LR,
+              'batch_size': cfg.DATALOADER.BATCH_SIZE,
+              'optimizer': 'SGD'
+              }
 
-    transform = T.ConvertImageDtype(torch.float32)
-    dataset = GrapeBunchesDataset(json_file, img_dir, (1280, 720), (275, 145),
-                                  apply_mask=True, transform=transform,
-                                  target_scaling=(0.0, 1080.0))
+    # Pass parameters to the Neptune run object
+    run['cfg_parameters'] = PARAMS
+
+    # convert into float32 and scale into [0,1]
+    transform = T.ConvertImageDtype(torch.float32)      
+
+    train_dataset = GrapeBunchesDataset(cfg.DATASET.ANNOTATIONS_PATH_TRAIN,
+                                        cfg.DATASET.IMAGES_PATH_TRAIN,
+                                        cfg.DATASET.IMAGE_SIZE,
+                                        cfg.DATASET.CROP_SIZE,
+                                        apply_mask=cfg.DATASET.MASKING,
+                                        transform=transform,
+                                        target_scaling=cfg.DATASET.TARGET_SCALING)
+    test_dataset = GrapeBunchesDataset(cfg.DATASET.ANNOTATIONS_PATH_TEST,
+                                       cfg.DATASET.IMAGES_PATH_TEST,
+                                       cfg.DATASET.IMAGE_SIZE,
+                                       cfg.DATASET.CROP_SIZE,
+                                       apply_mask=cfg.DATASET.MASKING,
+                                       transform=transform,
+                                       target_scaling=cfg.DATASET.TARGET_SCALING)
 
     # Create data loaders
-    batch_size = 4
-    train_dataloader = DataLoader(dataset, batch_size=batch_size)
-    test_dataloader = DataLoader(dataset, batch_size=batch_size)
+    train_dataloader = DataLoader(train_dataset,
+                                  batch_size=cfg.DATALOADER.BATCH_SIZE,
+                                  shuffle=True,
+                                  drop_last=True)
+    test_dataloader = DataLoader(test_dataset,
+                                 batch_size=cfg.DATALOADER.BATCH_SIZE,
+                                 shuffle=True,
+                                 drop_last=True)
 
     # Display images and labels
     figure = plt.figure(figsize=(8, 8))
     cols, rows = 3, 3
     for i in range(1, cols * rows + 1):
-        sample_idx = torch.randint(len(dataset), size=(1,)).item()
-        img, label = dataset[sample_idx]
+        sample_idx = torch.randint(len(train_dataset), size=(1,)).item()
+        img, label = train_dataset[sample_idx]
         figure.add_subplot(rows, cols, i)
         plt.title(label)
         plt.axis("off")
@@ -255,15 +313,28 @@ if __name__ == '__main__':
 
     # Optimizing the model parameters
     loss_fn = nn.MSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.SGD(model.parameters(), lr=cfg.SOLVER.BASE_LR)
 
     # Iterate training over epochs
-    epochs = 100
-    for t in range(epochs):
+    for t in range(cfg.SOLVER.EPOCHS):
         print(f"Epoch {t+1}\n-------------------------------")
-        train(train_dataloader, model, loss_fn, optimizer)
-        test(test_dataloader, model, loss_fn)
+        r2, mse, loss = train(train_dataloader, model, loss_fn, optimizer, device)
+        run['metrics/R2_score_train'].log(r2)
+        run['metrics/MSE_train'].log(mse)
+        run['metrics/total_loss_train'].log(loss)
+        r2, mse, loss = test(test_dataloader, model, loss_fn, device)
+        run['metrics/R2_score_test'].log(r2)
+        run['metrics/MSE_test'].log(mse)
+        run['metrics/total_loss_test'].log(loss)
     print("Done!")
+
+
+if __name__ == '__main__':
+    TORCH_VERSION = ".".join(torch.__version__.split(".")[:2])
+    CUDA_VERSION = torch.__version__.split("+")[-1]
+    print("torch: ", TORCH_VERSION, "; cuda: ", CUDA_VERSION)
+
+    main()
 
 
 # #### Save the mdoel ####

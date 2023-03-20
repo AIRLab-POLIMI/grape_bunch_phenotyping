@@ -1,0 +1,12 @@
+DATASET:
+  NAME: "red_globe_2021_volume_regression"
+  ANNOTATIONS_PATH_TRAIN: "/home/bertoglio/red_globe_2021_volume_regression/annotations_train_volume_weight.json"
+  ANNOTATIONS_PATH_TEST: "/home/bertoglio/red_globe_2021_volume_regression/annotations_val_volume_weight.json"
+  IMAGES_PATH_TRAIN: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/train/"
+  IMAGES_PATH_TEST: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/val/"
+  IMAGE_SIZE: (1280, 720)
+  CROP_SIZE: (275, 145)
+  MASKING: True
+  TARGET_SCALING: (0.0, 1080.0)
+DATALOADER:
+  BATCH_SIZE: 4
