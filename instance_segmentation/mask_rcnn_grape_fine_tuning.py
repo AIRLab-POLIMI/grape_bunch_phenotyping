@@ -311,7 +311,6 @@ def main(args):
     # ------ NEPTUNE LOGGING ------
 
     # Log fixed parameters in Neptune
-    # Tuned parameters (with Optuna) are commented out
     PARAMS = {'dataset_train': cfg.DATASETS.TRAIN,
               'dataset_test': cfg.DATASETS.TEST,
               'dataloader_num_workers': cfg.DATALOADER.NUM_WORKERS,
