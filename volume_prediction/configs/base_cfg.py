@@ -28,6 +28,9 @@ _C.DATALOADER.BATCH_SIZE = 2
 _C.SOLVER = CN()
 _C.SOLVER.EPOCHS = 100
 _C.SOLVER.BASE_LR = 0.001
+_C.SOLVER.MOMENTUM = 0.9
+_C.SOLVER.WEIGHT_DECAY = 0.0001
+_C.SOLVER.NESTEROV = False
 
 def get_base_cfg_defaults():
     """Get a yacs CfgNode object with default values for my_project."""

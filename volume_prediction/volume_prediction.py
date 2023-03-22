@@ -29,7 +29,7 @@ class GrapeBunchesDataset(Dataset):
     
     def __init__(self, annotations_file, img_dir, img_size, crop_size,
                  apply_mask=False, transform=None, target_transform=None,
-                 target_scaling=None):
+                 target_scaling=None, horizontal_flip=False):
         
         with open(annotations_file) as dictionary_file:
             json_dictionary = json.load(dictionary_file)
@@ -42,6 +42,7 @@ class GrapeBunchesDataset(Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.target_scaling = target_scaling
+        self.horizontal_flip = horizontal_flip
 
         filtered_ann = []
         img_id = 0
@@ -121,7 +122,7 @@ class GrapeBunchesDataset(Dataset):
 
         # resize the image if needed
         if self.fixed_img_size[0] != img_size[0] or self.fixed_img_size[1] != img_size[1]:
-            image = T.Resize(size=self.fixed_img_size)(image)
+            image = T.Resize(size=self.fixed_img_size, antialias=True)(image)
             # Calculate the scaling factor for the bounding box
             x_scale, y_scale = self.x_y_scale(img_size[1], img_size[0])
             # Resize the bounding box
@@ -143,6 +144,10 @@ class GrapeBunchesDataset(Dataset):
         custom_bbox = (custom_x, custom_y, self.crop_size[1], self.crop_size[0])
         img_crop = crop(image, custom_bbox[1], custom_bbox[0], custom_bbox[3], custom_bbox[2])
 
+        # TODO: implement horizontal flipping
+        if self.horizontal_flip:
+            img_crop = img_crop
+
         return img_crop, label
 
     def x_y_scale(self, img_width, img_height):
@@ -157,27 +162,47 @@ class CNNRegressor(nn.Module):
         super().__init__()
 
         # Define the convolutional layers
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
+        self.conv1_1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
+        self.conv1_2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=0)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.dropout1 = nn.Dropout2d(p=0.2)
+        self.conv2 = nn.Conv2d(64, 197, kernel_size=3, stride=1, padding=0)
+        self.bn2 = nn.BatchNorm2d(197)
+        self.dropout2 = nn.Dropout2d(p=0.2)
+        self.conv3 = nn.Conv2d(197, 256, kernel_size=3, stride=1, padding=0)
+        self.bn3 = nn.BatchNorm2d(256)
+        self.dropout3 = nn.Dropout2d(p=0.2)
+        self.conv4_1 = nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=0)
+        self.conv4_2 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=0)
+        self.bn4 = nn.BatchNorm2d(512)
+        self.dropout4 = nn.Dropout2d(p=0.2)
         
         # Define the pooling layer
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         
         # Define the fully connected layers
-        self.fc1 = nn.Linear(128*18*34, 512)
-        self.fc2 = nn.Linear(512, 1)
+        self.fc1 = nn.LazyLinear(4096)           # LazyLinear automatically infers the input size
+        self.dropout5 = nn.Dropout(p=0.5)
+        self.fc2 = nn.Linear(4096, 2622)
+        self.dropout6 = nn.Dropout(p=0.5)
+        self.fc3 = nn.Linear(2622, 1)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))
+        # batch normalization is applied before relu as suggested in the
+        # original paper but there is a debate whether is better before
+        # or after
+        x = self.dropout1(F.relu(self.bn1(self.conv1_2(self.conv1_1(x)))))
         x = self.pool(x)
-        x = F.relu(self.conv2(x))
+        x = self.dropout2(F.relu(self.bn2(self.conv2(x))))
         x = self.pool(x)
-        x = F.relu(self.conv3(x))
+        x = self.dropout3(F.relu(self.bn3(self.conv3(x))))
         x = self.pool(x)
-        x = x.view(-1, 128*18*34)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        x = self.dropout4(F.relu(self.bn4(self.conv4_2(self.conv4_1(x)))))
+        x = self.pool(x)
+        x = torch.flatten(x, start_dim=1)
+        x = self.dropout5(F.relu(self.fc1(x)))
+        x = self.dropout6(F.relu(self.fc2(x)))
+        x = F.relu(self.fc3(x))
         return x
 
 
@@ -251,21 +276,29 @@ def main():
     cfg.freeze()
 
     # Log parameters in Neptune
-    PARAMS = {'image_size': cfg.DATASET.IMAGE_SIZE,
-              'crop_size': cfg.DATASET.CROP_SIZE,
+    PARAMS = {'image_size': str(cfg.DATASET.IMAGE_SIZE),
+              'crop_size': str(cfg.DATASET.CROP_SIZE),
               'masking': cfg.DATASET.MASKING,
-              'target_scaling': cfg.DATASET.TARGET_SCALING,
+              'target_scaling': str(cfg.DATASET.TARGET_SCALING),
               'epochs': cfg.SOLVER.EPOCHS,
               'base_lr': cfg.SOLVER.BASE_LR,
               'batch_size': cfg.DATALOADER.BATCH_SIZE,
-              'optimizer': 'SGD'
+              'optimizer': 'SGD',
+              'momentum': cfg.SOLVER.MOMENTUM,
+              'weight_decay': cfg.SOLVER.WEIGHT_DECAY,
+              'nesterov': cfg.SOLVER.NESTEROV
               }
 
     # Pass parameters to the Neptune run object
     run['cfg_parameters'] = PARAMS
 
     # convert into float32 and scale into [0,1]
-    transform = T.ConvertImageDtype(torch.float32)      
+    # transforms = T.Compose([
+    #     T.RandomApply(T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0)),
+    #     T.ConvertImageDtype(torch.float32),
+    #     ])
+    
+    transform = T.ConvertImageDtype(torch.float32)
 
     train_dataset = GrapeBunchesDataset(cfg.DATASET.ANNOTATIONS_PATH_TRAIN,
                                         cfg.DATASET.IMAGES_PATH_TRAIN,
@@ -288,7 +321,7 @@ def main():
                                   shuffle=True,
                                   drop_last=True)
     test_dataloader = DataLoader(test_dataset,
-                                 batch_size=cfg.DATALOADER.BATCH_SIZE,
+                                 batch_size=len(test_dataset),
                                  shuffle=True,
                                  drop_last=True)
 
@@ -313,7 +346,10 @@ def main():
 
     # Optimizing the model parameters
     loss_fn = nn.MSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=cfg.SOLVER.BASE_LR)
+    optimizer = torch.optim.SGD(model.parameters(), lr=cfg.SOLVER.BASE_LR,
+                                momentum=cfg.SOLVER.MOMENTUM,
+                                weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+                                nesterov=cfg.SOLVER.NESTEROV)
 
     # Iterate training over epochs
     for t in range(cfg.SOLVER.EPOCHS):
