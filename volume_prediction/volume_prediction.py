@@ -15,31 +15,36 @@ import numpy as np
 from configs.base_cfg import get_base_cfg_defaults
 from torcheval.metrics import R2Score
 from torcheval.metrics import MeanSquaredError
+import re
+import cv2
 
 # Logging metadata with Neptune
 import neptune.new as neptune
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
-                       mode='async',        # use 'debug' to turn off logging, 'async' otherwise
+                       mode='debug',        # use 'debug' to turn off logging, 'async' otherwise
                        name='CNNRegressor',
                        tags=[])
 
 
 class GrapeBunchesDataset(Dataset):
-    
+
     def __init__(self, annotations_file, img_dir, img_size, crop_size,
-                 apply_mask=False, transform=None, target_transform=None,
+                 depth_dir=None, apply_mask=False, transform=None,
+                 depth_transform=None, target_transform=None,
                  target_scaling=None, horizontal_flip=False):
-        
+
         with open(annotations_file) as dictionary_file:
             json_dictionary = json.load(dictionary_file)
-        
+
         self.img_info = json_dictionary['images']
         self.img_dir = img_dir
         self.fixed_img_size = img_size      # img_size expressed as (height, width)
         self.crop_size = crop_size          # crop_size expressed as (height, width)
+        self.depth_dir = depth_dir
         self.apply_mask = apply_mask        # whether to isolate the single bunch with its mask
         self.transform = transform
+        self.depth_transform = depth_transform
         self.target_transform = target_transform
         self.target_scaling = target_scaling
         self.horizontal_flip = horizontal_flip
@@ -53,7 +58,16 @@ class GrapeBunchesDataset(Dataset):
                 for img in json_dictionary['images']:
                     if img['id'] == img_id:
                         img_width, img_height = img['width'], img['height']
+                        img_filename = img['file_name']
                         break
+
+            # TODO: FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
+            img_number = int(re.findall(r'\d+', img_filename)[0])
+            # filter out images with img_id greater than
+            if img_number > 45 and img_number < 73:
+                continue
+            # TODO: FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
+
             if ann['attributes']['tagged']:
                 if ann['attributes']['volume'] > 0.0 and ann['attributes']['weight'] > 0.0:
                     half_crop_width = math.ceil(crop_size[1]/2)
@@ -80,9 +94,10 @@ class GrapeBunchesDataset(Dataset):
         return len(self.img_labels)
 
     def __getitem__(self, idx):
-
-        ann = self.img_labels[idx]            
+        # get the annotation for the idx-th image
+        ann = self.img_labels[idx]
         label = ann['attributes']['volume']
+        # scale the label if required
         if self.target_scaling:
             min = self.target_scaling[0]
             max = self.target_scaling[1]
@@ -97,6 +112,7 @@ class GrapeBunchesDataset(Dataset):
                 img_size = [img['height'], img['width']]
                 break
 
+        # load RGB images
         img_path = os.path.join(self.img_dir, img_filename)
         image = read_image(img_path)
         bbox = ann['bbox']                  # bbox format is [x,y,width,height]
@@ -105,6 +121,24 @@ class GrapeBunchesDataset(Dataset):
             image = self.transform(image)
         if self.target_transform:
             label = self.target_transform(label)
+
+        # load depth images
+        if self.depth_dir:
+            # extract the number from img_filename with regex (r'\d+')
+            depth_filename = 'depth' + str(re.findall(r'\d+', img_filename)[0]) + '.png'            
+            depth_path = os.path.join(self.depth_dir, depth_filename)
+            # read image using cv2 and passthorugh as encoding
+            depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+            # scale image in the range [0, 1.0]
+            depth = depth / 6000.0
+            # convert to Torch tensor
+            depth = torch.from_numpy(depth)
+            # add a dimension to the depth image
+            depth = depth.unsqueeze(0)
+            if self.depth_transform:
+                depth = self.depth_transform(depth)
+            # concatenate depth image to RGB image
+            image = torch.cat((image, depth), 0)
 
         # apply segmentation mask if required
         if self.apply_mask:
@@ -144,9 +178,8 @@ class GrapeBunchesDataset(Dataset):
         custom_bbox = (custom_x, custom_y, self.crop_size[1], self.crop_size[0])
         img_crop = crop(image, custom_bbox[1], custom_bbox[0], custom_bbox[3], custom_bbox[2])
 
-        # TODO: implement horizontal flipping
         if self.horizontal_flip:
-            img_crop = img_crop
+            img_crop = T.RandomHorizontalFlip(p=0.5)(img_crop)
 
         return img_crop, label
 
@@ -293,26 +326,32 @@ def main():
     run['cfg_parameters'] = PARAMS
 
     # convert into float32 and scale into [0,1]
-    # transforms = T.Compose([
-    #     T.RandomApply(T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0)),
-    #     T.ConvertImageDtype(torch.float32),
-    #     ])
-    
-    transform = T.ConvertImageDtype(torch.float32)
+    convertdtype = T.ConvertImageDtype(torch.float32)
+
+    transforms = T.Compose([
+        T.RandomApply([T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0)]),
+        T.RandomApply([T.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))]),
+        convertdtype,
+        ])
 
     train_dataset = GrapeBunchesDataset(cfg.DATASET.ANNOTATIONS_PATH_TRAIN,
                                         cfg.DATASET.IMAGES_PATH_TRAIN,
                                         cfg.DATASET.IMAGE_SIZE,
                                         cfg.DATASET.CROP_SIZE,
+                                        depth_dir=cfg.DATASET.DEPTH_PATH_TRAIN,
                                         apply_mask=cfg.DATASET.MASKING,
-                                        transform=transform,
-                                        target_scaling=cfg.DATASET.TARGET_SCALING)
+                                        transform=transforms,
+                                        depth_transform=convertdtype,
+                                        target_scaling=cfg.DATASET.TARGET_SCALING,
+                                        horizontal_flip=True)
     test_dataset = GrapeBunchesDataset(cfg.DATASET.ANNOTATIONS_PATH_TEST,
                                        cfg.DATASET.IMAGES_PATH_TEST,
                                        cfg.DATASET.IMAGE_SIZE,
                                        cfg.DATASET.CROP_SIZE,
+                                       depth_dir=cfg.DATASET.DEPTH_PATH_TEST,
                                        apply_mask=cfg.DATASET.MASKING,
-                                       transform=transform,
+                                       transform=convertdtype,
+                                       depth_transform=convertdtype,
                                        target_scaling=cfg.DATASET.TARGET_SCALING)
 
     # Create data loaders
@@ -322,8 +361,8 @@ def main():
                                   drop_last=True)
     test_dataloader = DataLoader(test_dataset,
                                  batch_size=len(test_dataset),
-                                 shuffle=True,
-                                 drop_last=True)
+                                 shuffle=False,
+                                 drop_last=False)
 
     # Display images and labels
     figure = plt.figure(figsize=(8, 8))
@@ -331,6 +370,7 @@ def main():
     for i in range(1, cols * rows + 1):
         sample_idx = torch.randint(len(train_dataset), size=(1,)).item()
         img, label = train_dataset[sample_idx]
+        img = img[0:2, :, :]
         figure.add_subplot(rows, cols, i)
         plt.title(label)
         plt.axis("off")
@@ -371,17 +411,3 @@ if __name__ == '__main__':
     print("torch: ", TORCH_VERSION, "; cuda: ", CUDA_VERSION)
 
     main()
-
-
-# #### Save the mdoel ####
-# torch.save(model.state_dict(), "model.pth")
-# print("Saved PyTorch Model State to model.pth")
-
-
-# #### Make predictions ####
-# model.eval()
-# x, y = test_data[0][0], test_data[0][1]
-# with torch.no_grad():
-#     pred = model(x)
-#     predicted, actual = classes[pred[0].argmax(0)], classes[y]
-#     print(f'Predicted: "{predicted}", Actual: "{actual}"')

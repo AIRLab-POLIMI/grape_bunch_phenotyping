@@ -4,6 +4,8 @@ DATASET:
   ANNOTATIONS_PATH_TEST: "/home/bertoglio/red_globe_2021_volume_regression/annotations_val_volume_weight.json"
   IMAGES_PATH_TRAIN: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/train/"
   IMAGES_PATH_TEST: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/val/"
+  DEPTH_PATH_TRAIN: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/depth/"
+  DEPTH_PATH_TEST: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/depth/"
   IMAGE_SIZE: (1280, 720)
   CROP_SIZE: (275, 145)
   MASKING: True
@@ -15,4 +17,4 @@ SOLVER:
   WEIGHT_DECAY: 0.000001
   NESTEROV: True
   BASE_LR: 0.001
-  EPOCHS: 50
+  EPOCHS: 1000
