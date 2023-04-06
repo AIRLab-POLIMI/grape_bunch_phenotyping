@@ -1,7 +1,7 @@
 DATASET:
   NAME: "red_globe_2021_volume_regression"
-  ANNOTATIONS_PATH_TRAIN: "/home/bertoglio/red_globe_2021_volume_regression/annotations_train_volume_weight.json"
-  ANNOTATIONS_PATH_TEST: "/home/bertoglio/red_globe_2021_volume_regression/annotations_val_volume_weight.json"
+  ANNOTATIONS_PATH_TRAIN: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_train.json"
+  ANNOTATIONS_PATH_TEST: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_val.json"
   IMAGES_PATH_TRAIN: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/train/"
   IMAGES_PATH_TEST: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/val/"
   DEPTH_PATH_TRAIN: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/depth/"
