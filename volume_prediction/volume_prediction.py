@@ -22,9 +22,9 @@ import cv2
 import neptune.new as neptune
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
-                       mode='debug',        # use 'debug' to turn off logging, 'async' otherwise
+                       mode='async',        # use 'debug' to turn off logging, 'async' otherwise
                        name='CNNRegressor',
-                       tags=[])
+                       tags=['with_depth'])
 
 
 class GrapeBunchesDataset(Dataset):
@@ -64,7 +64,7 @@ class GrapeBunchesDataset(Dataset):
             # TODO: FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
             img_number = int(re.findall(r'\d+', img_filename)[0])
             # filter out images with img_id greater than
-            if img_number > 45 and img_number < 73:
+            if img_number > 49:
                 continue
             # TODO: FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
 
@@ -195,7 +195,7 @@ class CNNRegressor(nn.Module):
         super().__init__()
 
         # Define the convolutional layers
-        self.conv1_1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
+        self.conv1_1 = nn.Conv2d(4, 64, kernel_size=3, stride=1, padding=1)
         self.conv1_2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=0)
         self.bn1 = nn.BatchNorm2d(64)
         self.dropout1 = nn.Dropout2d(p=0.2)
@@ -370,7 +370,7 @@ def main():
     for i in range(1, cols * rows + 1):
         sample_idx = torch.randint(len(train_dataset), size=(1,)).item()
         img, label = train_dataset[sample_idx]
-        img = img[0:2, :, :]
+        img = img[0:3, :, :]
         figure.add_subplot(rows, cols, i)
         plt.title(label)
         plt.axis("off")
