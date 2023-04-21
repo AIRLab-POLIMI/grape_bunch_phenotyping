@@ -24,7 +24,7 @@ import neptune.new as neptune
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
                        name='CNNRegressor',
-                       tags=['with_depth'])
+                       tags=['with_depth', 'stratified_split', 'not_occluded'])
 
 
 class GrapeBunchesDataset(Dataset):
@@ -32,7 +32,8 @@ class GrapeBunchesDataset(Dataset):
     def __init__(self, annotations_file, img_dir, img_size, crop_size,
                  depth_dir=None, apply_mask=False, transform=None,
                  depth_transform=None, target_transform=None,
-                 target_scaling=None, horizontal_flip=False):
+                 target_scaling=None, horizontal_flip=False,
+                 not_occluded=False):
 
         with open(annotations_file) as dictionary_file:
             json_dictionary = json.load(dictionary_file)
@@ -61,14 +62,20 @@ class GrapeBunchesDataset(Dataset):
                         img_filename = img['file_name']
                         break
 
-            # TODO: FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
+            # FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
+            # TODO: REMOVE THIS FILTER AND DO IT DIRECTLY ON THE DATASET
             img_number = int(re.findall(r'\d+', img_filename)[0])
             # filter out images with img_id greater than
             if img_number > 49:
                 continue
-            # TODO: FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
+            # FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
 
             if ann['attributes']['tagged']:
+                # skip occluded bunches if the not_occluded parameter is True
+                if not_occluded:
+                    if not ann['attributes']['not_occluded']:
+                        continue
+                # skip bunches with volume/weight value <= 0.0
                 if ann['attributes']['volume'] > 0.0 and ann['attributes']['weight'] > 0.0:
                     half_crop_width = math.ceil(crop_size[1]/2)
                     half_crop_height = math.ceil(crop_size[0]/2)
@@ -209,10 +216,10 @@ class CNNRegressor(nn.Module):
         self.conv4_2 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=0)
         self.bn4 = nn.BatchNorm2d(512)
         self.dropout4 = nn.Dropout2d(p=0.2)
-        
+
         # Define the pooling layer
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        
+
         # Define the fully connected layers
         self.fc1 = nn.LazyLinear(4096)           # LazyLinear automatically infers the input size
         self.dropout5 = nn.Dropout(p=0.5)
@@ -313,6 +320,7 @@ def main():
               'crop_size': str(cfg.DATASET.CROP_SIZE),
               'masking': cfg.DATASET.MASKING,
               'target_scaling': str(cfg.DATASET.TARGET_SCALING),
+              'not_occluded': cfg.DATASET.NOT_OCCLUDED,
               'epochs': cfg.SOLVER.EPOCHS,
               'base_lr': cfg.SOLVER.BASE_LR,
               'batch_size': cfg.DATALOADER.BATCH_SIZE,
@@ -343,7 +351,8 @@ def main():
                                         transform=transforms,
                                         depth_transform=convertdtype,
                                         target_scaling=cfg.DATASET.TARGET_SCALING,
-                                        horizontal_flip=True)
+                                        horizontal_flip=True,
+                                        not_occluded=cfg.DATASET.NOT_OCCLUDED)
     test_dataset = GrapeBunchesDataset(cfg.DATASET.ANNOTATIONS_PATH_TEST,
                                        cfg.DATASET.IMAGES_PATH_TEST,
                                        cfg.DATASET.IMAGE_SIZE,
@@ -352,7 +361,10 @@ def main():
                                        apply_mask=cfg.DATASET.MASKING,
                                        transform=convertdtype,
                                        depth_transform=convertdtype,
-                                       target_scaling=cfg.DATASET.TARGET_SCALING)
+                                       target_scaling=cfg.DATASET.TARGET_SCALING,
+                                       not_occluded=cfg.DATASET.NOT_OCCLUDED)
+
+    assert cfg.DATALOADER.BATCH_SIZE <= len(train_dataset), "Batch size is larger than the training dataset size"
 
     # Create data loaders
     train_dataloader = DataLoader(train_dataset,
