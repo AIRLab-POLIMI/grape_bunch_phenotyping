@@ -17,6 +17,7 @@ _C.DATASET.IMAGE_SIZE = ()
 _C.DATASET.CROP_SIZE = ()
 _C.DATASET.MASKING = False
 _C.DATASET.TARGET_SCALING = ()
+_C.DATASET.NOT_OCCLUDED = False
 
 # -----------------------------------------------------------------------------
 # DataLoader

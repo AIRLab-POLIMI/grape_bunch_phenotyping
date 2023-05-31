@@ -1,17 +1,18 @@
 DATASET:
   NAME: "red_globe_2021_volume_regression"
-  ANNOTATIONS_PATH_TRAIN: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_train.json"
-  ANNOTATIONS_PATH_TEST: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_val.json"
-  IMAGES_PATH_TRAIN: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/train/"
-  IMAGES_PATH_TEST: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/val/"
-  DEPTH_PATH_TRAIN: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/depth/"
-  DEPTH_PATH_TEST: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/depth/"
+  ANNOTATIONS_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_train.json"
+  ANNOTATIONS_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_val.json"
+  IMAGES_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/train/"
+  IMAGES_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/val/"
+  # DEPTH_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/depth/"
+  # DEPTH_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/depth/"
   IMAGE_SIZE: (1280, 720)
   CROP_SIZE: (275, 145)
-  MASKING: True
+  MASKING: False
   TARGET_SCALING: (0.0, 1080.0)
+  NOT_OCCLUDED: True
 DATALOADER:
-  BATCH_SIZE: 64
+  BATCH_SIZE: 40
 SOLVER:
   MOMENTUM: 0.3
   WEIGHT_DECAY: 0.000001

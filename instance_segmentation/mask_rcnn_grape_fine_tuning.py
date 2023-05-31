@@ -36,7 +36,7 @@ import neptune.new as neptune
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
                        name='scratch_mask_rcnn_R_50_FPN_9x_gn_training',
-                       tags=['official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
+                       tags=['WGISG', 'official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
 
 
 logger = logging.getLogger("detectron2")
