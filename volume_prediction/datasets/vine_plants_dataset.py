@@ -22,7 +22,7 @@ class VinePlantsDataset(Dataset):
         with open(annotations_file) as dictionary_file:
             json_dictionary = json.load(dictionary_file)
 
-        self.img_info = json_dictionary['images']
+        self.json_imgs = json_dictionary['images']
         self.img_dir = img_dir
         self.fixed_img_size = img_size      # img_size expressed as (height, width)
         self.crop_size = crop_size          # crop_size expressed as (height, width)
@@ -33,15 +33,46 @@ class VinePlantsDataset(Dataset):
         self.target_transform = target_transform
         self.target_scaling = target_scaling
         self.horizontal_flip = horizontal_flip
+        self.anns_dict = {}
 
-        filtered_ann = []
-        img_id = 0
         for ann in json_dictionary['annotations']:
-            if ann['image_id'] != img_id:
-                img_id = ann['image_id']
-                img_width, img_height = 0, 0
-                for img in json_dictionary['images']:
-                    if img['id'] == img_id:
-                        img_width, img_height = img['width'], img['height']
-                        img_filename = img['file_name']
-                        break
+            if self.anns_dict[ann['image_id']]:
+                self.anns_dict[ann['image_id']].append(ann)
+            else:
+                self.anns_dict[ann['image_id']] = [ann]
+
+    def __len__(self):
+        return len(self.json_imgs)
+    
+    def __getitem__(self, idx):
+        # get the json img
+        img = self.json_imgs[idx]
+        img_size = (img['height'], img['width'])
+
+        # load the image
+        img_path = os.path.join(self.img_dir, img['file_name'])
+        image = read_image(img_path)
+
+        # create the target (sum of the volumes of the bunches)
+        label = 0
+        for ann in self.anns_dict[img['id']]:
+            if ann['attributes']['is_cut'] or not (ann['attributes']['volume'] > 0.0 and ann['attributes']['weight'] > 0.0):
+                # cut out the grape bunch from the image
+                # and replace it with black pixels
+                segmentation_mask = ann['segmentation']
+                rles = maskUtils.frPyObjects(segmentation_mask, img_size[0], img_size[1])
+                rle = maskUtils.merge(rles)
+                mask = maskUtils.decode(rle)
+                mask = np.array(mask, dtype=np.float32)
+                # mask = ! mask negation of the mask
+                # convert the mask to a Torch tensor
+                mask = torch.from_numpy(mask)
+                # apply the mask to the image
+                image = image * mask
+            else:
+                label += ann['attributes']['volume']
+
+
+
+
+
