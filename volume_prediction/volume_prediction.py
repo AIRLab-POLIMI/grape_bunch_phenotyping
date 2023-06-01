@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 from configs.base_cfg import get_base_cfg_defaults
 from torcheval.metrics import R2Score
 from torcheval.metrics import MeanSquaredError
-
 from datasets.grape_bunches_dataset import GrapeBunchesDataset
 
 # Logging metadata with Neptune
@@ -16,7 +15,7 @@ import neptune.new as neptune
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
                        name='CNNRegressor',
-                       tags=['no_masking', 'without_depth', 'stratified_split', 'not_occluded'])
+                       tags=['scaling_from_train', 'all_images', 'without_depth', 'stratified_split', 'not_occluded'])
 
 
 class CNNRegressor(nn.Module):
@@ -158,6 +157,7 @@ def main():
     # convert into float32 and scale into [0,1]
     convertdtype = T.ConvertImageDtype(torch.float32)
 
+    # TODO: add image standardization with mean and std
     transforms = T.Compose([
         T.RandomApply([T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0)]),
         T.RandomApply([T.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))]),

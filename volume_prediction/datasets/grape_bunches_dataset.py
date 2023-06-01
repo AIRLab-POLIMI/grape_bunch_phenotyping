@@ -23,7 +23,8 @@ class GrapeBunchesDataset(Dataset):
         with open(annotations_file) as dictionary_file:
             json_dictionary = json.load(dictionary_file)
 
-        self.img_info = json_dictionary['images']
+        self.json_imgs = json_dictionary['images']
+        self.imgs_dict = {}
         self.img_dir = img_dir
         self.fixed_img_size = img_size      # img_size expressed as (height, width)
         self.crop_size = crop_size          # crop_size expressed as (height, width)
@@ -36,23 +37,21 @@ class GrapeBunchesDataset(Dataset):
         self.horizontal_flip = horizontal_flip
 
         filtered_ann = []
-        img_id = 0
+
+        for img in self.json_imgs:
+            self.imgs_dict[img['id']] = img
+
         for ann in json_dictionary['annotations']:
-            if ann['image_id'] != img_id:
-                img_id = ann['image_id']
-                img_width, img_height = 0, 0
-                for img in json_dictionary['images']:
-                    if img['id'] == img_id:
-                        img_width, img_height = img['width'], img['height']
-                        img_filename = img['file_name']
-                        break
+            img_id = ann['image_id']
+            img_width, img_height = self.imgs_dict[img_id]['width'], self.imgs_dict[img_id]['height']
 
             # FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
             # TODO: REMOVE THIS FILTER AND DO IT DIRECTLY ON THE DATASET
-            img_number = int(re.findall(r'\d+', img_filename)[0])
+            # img_filename = self.imgs_dict[img_id]['file_name']
+            # img_number = int(re.findall(r'\d+', img_filename)[0])
             # filter out images with img_id greater than
-            if img_number > 49:
-                continue
+            # if img_number > 49:
+            #     continue
             # FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
 
             if ann['attributes']['tagged']:
@@ -82,6 +81,13 @@ class GrapeBunchesDataset(Dataset):
         # are distant from all image borders at least half of crop_size.
         self.img_labels = filtered_ann
 
+        # TODO: temporary overwrite of config parameters
+        if self.target_scaling:
+            # Compute the maximum and minimum volume values using lambda functions
+            max_volume = max(filtered_ann, key=lambda ann: ann['attributes']['volume'])['attributes']['volume']
+            min_volume = min(filtered_ann, key=lambda ann: ann['attributes']['volume'])['attributes']['volume']
+            self.target_scaling = (min_volume, max_volume)
+
     def __len__(self):
         return len(self.img_labels)
 
@@ -96,15 +102,10 @@ class GrapeBunchesDataset(Dataset):
             label = (label - min) / (max - min)
 
         img_id = ann['image_id']
-        img_filename = []
-        img_size = []
-        for img in self.img_info:
-            if img['id'] == img_id:
-                img_filename = img['file_name']
-                img_size = [img['height'], img['width']]
-                break
+        img_filename = self.imgs_dict[img_id]['file_name']
+        img_size = [self.imgs_dict[img_id]['height'], self.imgs_dict[img_id]['width']]
 
-        # load RGB images
+        # load RGB image
         img_path = os.path.join(self.img_dir, img_filename)
         image = read_image(img_path)
         bbox = ann['bbox']                  # bbox format is [x,y,width,height]

@@ -8,7 +8,7 @@ DATASET:
   # DEPTH_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/depth/"
   IMAGE_SIZE: (1280, 720)
   CROP_SIZE: (275, 145)
-  MASKING: False
+  MASKING: True
   TARGET_SCALING: (0.0, 1080.0)
   NOT_OCCLUDED: True
 DATALOADER:
