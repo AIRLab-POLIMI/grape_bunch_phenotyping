@@ -14,9 +14,9 @@ from torch.utils.data import Dataset
 
 class GrapeBunchesDataset(Dataset):
 
-    def __init__(self, annotations_file, img_dir, img_size, crop_size,
-                 depth_dir=None, apply_mask=False, transform=None,
-                 depth_transform=None, target_transform=None,
+    def __init__(self, annotations_file, target, img_dir, img_size, crop_size,
+                 depth_dir=None, apply_mask=False, color_transform=None,
+                 color_depth_transform=None, target_transform=None,
                  target_scaling=True, horizontal_flip=False,
                  not_occluded=False):
 
@@ -24,14 +24,15 @@ class GrapeBunchesDataset(Dataset):
             json_dictionary = json.load(dictionary_file)
 
         self.json_imgs = json_dictionary['images']
+        self.target = target
         self.imgs_dict = {}
         self.img_dir = img_dir
         self.fixed_img_size = img_size      # img_size expressed as (height, width)
         self.crop_size = crop_size          # crop_size expressed as (height, width)
         self.depth_dir = depth_dir
         self.apply_mask = apply_mask        # whether to isolate the single bunch with its mask
-        self.transform = transform
-        self.depth_transform = depth_transform
+        self.color_transform = color_transform
+        self.color_depth_transform = color_depth_transform
         self.target_transform = target_transform
         self.target_scaling = target_scaling
         self.min_max_target = None
@@ -60,8 +61,8 @@ class GrapeBunchesDataset(Dataset):
                 if not_occluded:
                     if not ann['attributes']['not_occluded']:
                         continue
-                # skip bunches with volume/weight value <= 0.0
-                if ann['attributes']['volume'] > 0.0 and ann['attributes']['weight'] > 0.0:
+                # skip bunches with target value (volume/weight) <= 0.0
+                if ann['attributes'][self.target] > 0.0:
                     half_crop_width = math.ceil(crop_size[1]/2)
                     half_crop_height = math.ceil(crop_size[0]/2)
                     # check whether bboxes are distant from borders at least half of corresponding crop size
@@ -82,11 +83,15 @@ class GrapeBunchesDataset(Dataset):
         # are distant from all image borders at least half of crop_size.
         self.img_labels = filtered_ann
 
-        if self.target_scaling:
-            # Compute the maximum and minimum volume values using lambda functions
-            max_target = max(filtered_ann, key=lambda ann: ann['attributes']['volume'])['attributes']['volume']
-            min_target = min(filtered_ann, key=lambda ann: ann['attributes']['volume'])['attributes']['volume']
+        # if target_scaling is a boolean, then compute the min and max target values
+        if isinstance(self.target_scaling, bool):
+            # Compute the maximum and minimum target values using lambda functions
+            max_target = max(filtered_ann, key=lambda ann: ann['attributes'][self.target])['attributes'][self.target]
+            min_target = min(filtered_ann, key=lambda ann: ann['attributes'][self.target])['attributes'][self.target]
             self.min_max_target = (min_target, max_target)
+        # if target_scaling is a tuple, then use the values in the tuple as min and max target values
+        elif isinstance(self.target_scaling, tuple):
+            self.min_max_target = self.target_scaling
 
     def __len__(self):
         return len(self.img_labels)
@@ -94,12 +99,16 @@ class GrapeBunchesDataset(Dataset):
     def __getitem__(self, idx):
         # get the annotation for the idx-th image
         ann = self.img_labels[idx]
-        label = ann['attributes']['volume']
+        label = ann['attributes'][self.target]
+
+        if self.target_transform:
+            label = self.target_transform(label)
+
         # scale the label if required
         if self.target_scaling:
-            min = self.target_scaling[0]
-            max = self.target_scaling[1]
-            label = (label - min) / (max - min)
+            min = self.min_max_target[0]
+            max = self.min_max_target[1]
+            label = (label - min) / (max - min)        
 
         img_id = ann['image_id']
         img_filename = self.imgs_dict[img_id]['file_name']
@@ -110,10 +119,9 @@ class GrapeBunchesDataset(Dataset):
         image = read_image(img_path)
         bbox = ann['bbox']                  # bbox format is [x,y,width,height]
 
-        if self.transform:
-            image = self.transform(image)
-        if self.target_transform:
-            label = self.target_transform(label)
+        if self.color_transform:
+            image = self.color_transform(image)
+        image = T.ConvertImageDtype(torch.float32)(image)
 
         # load depth images
         if self.depth_dir:
@@ -128,8 +136,7 @@ class GrapeBunchesDataset(Dataset):
             depth = torch.from_numpy(depth)
             # add a dimension to the depth image
             depth = depth.unsqueeze(0)
-            if self.depth_transform:
-                depth = self.depth_transform(depth)
+            depth = T.ConvertImageDtype(torch.float32)(depth)
             # concatenate depth image to RGB image
             image = torch.cat((image, depth), 0)
 
@@ -171,8 +178,8 @@ class GrapeBunchesDataset(Dataset):
         custom_bbox = (custom_x, custom_y, self.crop_size[1], self.crop_size[0])
         img_crop = crop(image, custom_bbox[1], custom_bbox[0], custom_bbox[3], custom_bbox[2])
 
-        if self.horizontal_flip:
-            img_crop = T.RandomHorizontalFlip(p=0.5)(img_crop)
+        if self.color_depth_transform:
+            img_crop = self.color_depth_transform(img_crop)
 
         return img_crop, label
 

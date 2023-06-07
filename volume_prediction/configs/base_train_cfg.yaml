@@ -11,6 +11,8 @@ DATASET:
   MASKING: True
   TARGET_SCALING: True
   NOT_OCCLUDED: True
+  TARGET: "volume"
+  TYPE: "plants"
 DATALOADER:
   BATCH_SIZE: 40
 SOLVER:

@@ -8,12 +8,13 @@ from configs.base_cfg import get_base_cfg_defaults
 from torcheval.metrics import R2Score
 from torcheval.metrics import MeanSquaredError
 from datasets.grape_bunches_dataset import GrapeBunchesDataset
+from datasets.vine_plants_dataset import VinePlantsDataset
 
 # Logging metadata with Neptune
 import neptune.new as neptune
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
-                       mode='async',        # use 'debug' to turn off logging, 'async' otherwise
+                       mode='debug',        # use 'debug' to turn off logging, 'async' otherwise
                        name='CNNRegressor',
                        tags=['scaling_from_train', 'all_images', 'without_depth', 'stratified_split', 'not_occluded'])
 
@@ -158,33 +159,64 @@ def main():
     convertdtype = T.ConvertImageDtype(torch.float32)
 
     # TODO: add image standardization with mean and std
-    transforms = T.Compose([
+    color_transforms = T.Compose([
         T.RandomApply([T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0)]),
-        T.RandomApply([T.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))]),
-        convertdtype,
+        T.RandomApply([T.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))])
         ])
 
-    train_dataset = GrapeBunchesDataset(cfg.DATASET.ANNOTATIONS_PATH_TRAIN,
-                                        cfg.DATASET.IMAGES_PATH_TRAIN,
-                                        cfg.DATASET.IMAGE_SIZE,
-                                        cfg.DATASET.CROP_SIZE,
-                                        depth_dir=cfg.DATASET.DEPTH_PATH_TRAIN,
-                                        apply_mask=cfg.DATASET.MASKING,
-                                        transform=transforms,
-                                        depth_transform=convertdtype,
-                                        target_scaling=cfg.DATASET.TARGET_SCALING,
-                                        horizontal_flip=True,
-                                        not_occluded=cfg.DATASET.NOT_OCCLUDED)
-    test_dataset = GrapeBunchesDataset(cfg.DATASET.ANNOTATIONS_PATH_TEST,
-                                       cfg.DATASET.IMAGES_PATH_TEST,
-                                       cfg.DATASET.IMAGE_SIZE,
-                                       cfg.DATASET.CROP_SIZE,
-                                       depth_dir=cfg.DATASET.DEPTH_PATH_TEST,
-                                       apply_mask=cfg.DATASET.MASKING,
-                                       transform=convertdtype,
-                                       depth_transform=convertdtype,
-                                       target_scaling=cfg.DATASET.TARGET_SCALING,
-                                       not_occluded=cfg.DATASET.NOT_OCCLUDED)
+    color_depth_transforms = T.Compose([
+        T.RandomHorizontalFlip(p=0.5),
+        T.RandomRotation(degrees=(0, 20)),
+        T.RandomAffine(degrees=0, translate=(0.1, 0.3))
+    ])
+
+    train_dataset = None
+    test_dataset = None
+
+    if cfg.DATASET.TYPE == 'bunches':
+        train_dataset = GrapeBunchesDataset(cfg.DATASET.ANNOTATIONS_PATH_TRAIN,
+                                            cfg.DATASET.TARGET,
+                                            cfg.DATASET.IMAGES_PATH_TRAIN,
+                                            cfg.DATASET.IMAGE_SIZE,
+                                            cfg.DATASET.CROP_SIZE,
+                                            depth_dir=cfg.DATASET.DEPTH_PATH_TRAIN,
+                                            apply_mask=cfg.DATASET.MASKING,
+                                            color_transform=color_transforms,
+                                            color_depth_transform=color_depth_transforms,
+                                            target_scaling=cfg.DATASET.TARGET_SCALING,
+                                            horizontal_flip=True,
+                                            not_occluded=cfg.DATASET.NOT_OCCLUDED)
+        test_dataset = GrapeBunchesDataset(cfg.DATASET.ANNOTATIONS_PATH_TEST,
+                                            cfg.DATASET.TARGET,
+                                            cfg.DATASET.IMAGES_PATH_TEST,
+                                            cfg.DATASET.IMAGE_SIZE,
+                                            cfg.DATASET.CROP_SIZE,
+                                            depth_dir=cfg.DATASET.DEPTH_PATH_TEST,
+                                            apply_mask=cfg.DATASET.MASKING,
+                                            color_transform=None,
+                                            color_depth_transform=None,
+                                            target_scaling=train_dataset.min_max_target,
+                                            not_occluded=cfg.DATASET.NOT_OCCLUDED)
+    elif cfg.DATASET.TYPE == 'plants':
+        train_dataset = VinePlantsDataset(cfg.DATASET.ANNOTATIONS_PATH_TRAIN,
+                                          cfg.DATASET.TARGET,
+                                          cfg.DATASET.IMAGES_PATH_TRAIN,
+                                          cfg.DATASET.IMAGE_SIZE,
+                                          depth_dir=cfg.DATASET.DEPTH_PATH_TRAIN,
+                                          transform=transforms,
+                                          depth_transform=convertdtype,
+                                          target_scaling=cfg.DATASET.TARGET_SCALING,
+                                          horizontal_flip=True,
+                                          not_occluded=cfg.DATASET.NOT_OCCLUDED)
+        test_dataset = VinePlantsDataset(cfg.DATASET.ANNOTATIONS_PATH_TEST,
+                                          cfg.DATASET.TARGET,
+                                          cfg.DATASET.IMAGES_PATH_TEST,
+                                          cfg.DATASET.IMAGE_SIZE,
+                                          depth_dir=cfg.DATASET.DEPTH_PATH_TEST,
+                                          transform=convertdtype,
+                                          depth_transform=convertdtype,
+                                          target_scaling=train_dataset.min_max_target,
+                                          not_occluded=cfg.DATASET.NOT_OCCLUDED)
 
     assert cfg.DATALOADER.BATCH_SIZE <= len(train_dataset), "Batch size is larger than the training dataset size"
 

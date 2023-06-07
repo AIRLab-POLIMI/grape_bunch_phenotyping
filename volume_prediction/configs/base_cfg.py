@@ -18,6 +18,8 @@ _C.DATASET.CROP_SIZE = ()
 _C.DATASET.MASKING = False
 _C.DATASET.TARGET_SCALING = True
 _C.DATASET.NOT_OCCLUDED = False
+_C.DATASET.TARGET = ""
+_C.DATASET.TYPE = ""
 
 # -----------------------------------------------------------------------------
 # DataLoader
