@@ -119,7 +119,7 @@ class VinePlantsDataset(Dataset):
             depth = T.ConvertImageDtype(torch.float32)(depth)
             # concatenate depth image to RGB image
             image = torch.cat((image, depth), 0)
-        
+
         if self.color_depth_transform:
             image = self.color_depth_transform(image)
 

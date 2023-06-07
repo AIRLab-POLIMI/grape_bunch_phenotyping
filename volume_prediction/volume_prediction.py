@@ -166,8 +166,8 @@ def main():
 
     color_depth_transforms = T.Compose([
         T.RandomHorizontalFlip(p=0.5),
-        T.RandomRotation(degrees=(0, 20)),
-        T.RandomAffine(degrees=0, translate=(0.1, 0.3))
+        T.RandomRotation(degrees=(0, 15)),
+        T.RandomAffine(degrees=0, translate=(0.05, 0.15))
     ])
 
     train_dataset = None
@@ -203,8 +203,8 @@ def main():
                                           cfg.DATASET.IMAGES_PATH_TRAIN,
                                           cfg.DATASET.IMAGE_SIZE,
                                           depth_dir=cfg.DATASET.DEPTH_PATH_TRAIN,
-                                          transform=transforms,
-                                          depth_transform=convertdtype,
+                                          color_transform=color_transforms,
+                                          color_depth_transform=color_depth_transforms,
                                           target_scaling=cfg.DATASET.TARGET_SCALING,
                                           horizontal_flip=True,
                                           not_occluded=cfg.DATASET.NOT_OCCLUDED)
@@ -213,8 +213,8 @@ def main():
                                           cfg.DATASET.IMAGES_PATH_TEST,
                                           cfg.DATASET.IMAGE_SIZE,
                                           depth_dir=cfg.DATASET.DEPTH_PATH_TEST,
-                                          transform=convertdtype,
-                                          depth_transform=convertdtype,
+                                          color_transform=None,
+                                          color_depth_transform=None,
                                           target_scaling=train_dataset.min_max_target,
                                           not_occluded=cfg.DATASET.NOT_OCCLUDED)
 
