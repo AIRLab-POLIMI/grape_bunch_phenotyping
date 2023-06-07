@@ -10,14 +10,14 @@ import torchvision.transforms as T
 from torchvision.io import read_image
 from torchvision.transforms.functional import crop
 from torch.utils.data import Dataset
-        
+
 
 class GrapeBunchesDataset(Dataset):
 
     def __init__(self, annotations_file, img_dir, img_size, crop_size,
                  depth_dir=None, apply_mask=False, transform=None,
                  depth_transform=None, target_transform=None,
-                 target_scaling=None, horizontal_flip=False,
+                 target_scaling=True, horizontal_flip=False,
                  not_occluded=False):
 
         with open(annotations_file) as dictionary_file:
@@ -34,6 +34,7 @@ class GrapeBunchesDataset(Dataset):
         self.depth_transform = depth_transform
         self.target_transform = target_transform
         self.target_scaling = target_scaling
+        self.min_max_target = None
         self.horizontal_flip = horizontal_flip
 
         filtered_ann = []
@@ -81,12 +82,11 @@ class GrapeBunchesDataset(Dataset):
         # are distant from all image borders at least half of crop_size.
         self.img_labels = filtered_ann
 
-        # TODO: temporary overwrite of config parameters
         if self.target_scaling:
             # Compute the maximum and minimum volume values using lambda functions
-            max_volume = max(filtered_ann, key=lambda ann: ann['attributes']['volume'])['attributes']['volume']
-            min_volume = min(filtered_ann, key=lambda ann: ann['attributes']['volume'])['attributes']['volume']
-            self.target_scaling = (min_volume, max_volume)
+            max_target = max(filtered_ann, key=lambda ann: ann['attributes']['volume'])['attributes']['volume']
+            min_target = min(filtered_ann, key=lambda ann: ann['attributes']['volume'])['attributes']['volume']
+            self.min_max_target = (min_target, max_target)
 
     def __len__(self):
         return len(self.img_labels)
