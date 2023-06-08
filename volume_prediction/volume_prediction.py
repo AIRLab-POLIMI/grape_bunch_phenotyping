@@ -155,9 +155,6 @@ def main():
     # Pass parameters to the Neptune run object
     run['cfg_parameters'] = PARAMS
 
-    # convert into float32 and scale into [0,1]
-    convertdtype = T.ConvertImageDtype(torch.float32)
-
     # TODO: add image standardization with mean and std
     color_transforms = T.Compose([
         T.RandomApply([T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0)]),
@@ -166,8 +163,8 @@ def main():
 
     color_depth_transforms = T.Compose([
         T.RandomHorizontalFlip(p=0.5),
-        T.RandomRotation(degrees=(0, 15)),
-        T.RandomAffine(degrees=0, translate=(0.05, 0.15))
+        T.RandomRotation(degrees=(0, 5)),
+        T.RandomAffine(degrees=0, translate=(0.02, 0.20))
     ])
 
     train_dataset = None
@@ -218,7 +215,7 @@ def main():
                                           target_scaling=train_dataset.min_max_target,
                                           not_occluded=cfg.DATASET.NOT_OCCLUDED)
 
-    assert cfg.DATALOADER.BATCH_SIZE <= len(train_dataset), "Batch size is larger than the training dataset size"
+    assert cfg.DATALOADER.BATCH_SIZE <= len(train_dataset), f"Batch size ({cfg.DATALOADER.BATCH_SIZE}) is larger than the training dataset size ({len(train_dataset)})"
 
     # Create data loaders
     train_dataloader = DataLoader(train_dataset,
@@ -231,7 +228,7 @@ def main():
                                  drop_last=False)
 
     # Display images and labels
-    figure = plt.figure(figsize=(8, 8))
+    figure = plt.figure(figsize=(32, 32))
     cols, rows = 3, 3
     for i in range(1, cols * rows + 1):
         sample_idx = torch.randint(len(train_dataset), size=(1,)).item()

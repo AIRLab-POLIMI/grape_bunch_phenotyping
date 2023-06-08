@@ -51,7 +51,7 @@ class GrapeBunchesDataset(Dataset):
             # TODO: REMOVE THIS FILTER AND DO IT DIRECTLY ON THE DATASET
             # img_filename = self.imgs_dict[img_id]['file_name']
             # img_number = int(re.findall(r'\d+', img_filename)[0])
-            # filter out images with img_id greater than
+            # filter out images with img_number greater than 49
             # if img_number > 49:
             #     continue
             # FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
@@ -121,6 +121,7 @@ class GrapeBunchesDataset(Dataset):
 
         if self.color_transform:
             image = self.color_transform(image)
+        # convert into float32 and scale into [0,1]
         image = T.ConvertImageDtype(torch.float32)(image)
 
         # load depth images

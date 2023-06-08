@@ -46,6 +46,14 @@ class VinePlantsDataset(Dataset):
         # remove from json_imgs the images that do not have at least a valid annotation
         new_json_imgs = []
         for img in self.json_imgs:
+            # FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
+            # TODO: REMOVE THIS FILTER AND DO IT DIRECTLY ON THE DATASET
+            # img_filename = img['file_name']
+            # img_number = int(re.findall(r'\d+', img_filename)[0])
+            # filter out images with img_id greater than
+            # if img_number > 49:
+            #     continue
+            # FILTER OUT IMAGES OF SEPTEMBER BECAUSE OF INVALID DEPTH
             if any([not ann['attributes']['cut'] and
                     ann['attributes'][self.target] > 0.0
                     for ann in self.anns_dict[img['id']]]):
@@ -78,6 +86,8 @@ class VinePlantsDataset(Dataset):
         # load the image
         img_path = os.path.join(self.img_dir, img['file_name'])
         image = read_image(img_path)
+        # convert into float32 and scale into [0,1]
+        image = T.ConvertImageDtype(torch.float32)(image)
 
         # put a black pixels mask on all invalid annotations
         for ann in self.anns_dict[img['id']]:
@@ -97,11 +107,6 @@ class VinePlantsDataset(Dataset):
 
         if self.color_transform:
             image = self.color_transform(image)
-        image = T.ConvertImageDtype(torch.float32)(image)
-
-        # resize the image if needed
-        if self.fixed_img_size[0] != img_size[0] or self.fixed_img_size[1] != img_size[1]:
-            image = T.Resize(size=self.fixed_img_size, antialias=True)(image)
 
         # load depth images
         if self.depth_dir:
@@ -119,6 +124,10 @@ class VinePlantsDataset(Dataset):
             depth = T.ConvertImageDtype(torch.float32)(depth)
             # concatenate depth image to RGB image
             image = torch.cat((image, depth), 0)
+
+        # resize the image if needed
+        if self.fixed_img_size[0] != img_size[0] or self.fixed_img_size[1] != img_size[1]:
+            image = T.Resize(size=self.fixed_img_size, antialias=True)(image)
 
         if self.color_depth_transform:
             image = self.color_depth_transform(image)
