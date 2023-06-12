@@ -4,11 +4,9 @@ import cv2
 from pycocotools import mask as maskUtils
 import numpy as np
 import json
-import math
 import torch
 import torchvision.transforms as T
 from torchvision.io import read_image
-from torchvision.transforms.functional import crop
 from torch.utils.data import Dataset
 
 

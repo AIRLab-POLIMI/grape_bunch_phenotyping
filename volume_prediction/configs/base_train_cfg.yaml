@@ -1,11 +1,11 @@
 DATASET:
   NAME: "red_globe_2021_volume_regression"
-  ANNOTATIONS_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_train.json"
-  ANNOTATIONS_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_val.json"
-  IMAGES_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/train/"
-  IMAGES_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/val/"
-  # DEPTH_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/depth/"
-  # DEPTH_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/depth/"
+  ANNOTATIONS_PATH_TRAIN: "/home/user/red_globe_2021_datasets/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_train.json"
+  ANNOTATIONS_PATH_TEST: "/home/user/red_globe_2021_datasets/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_val.json"
+  IMAGES_PATH_TRAIN: "/home/user/red_globe_2021_datasets/red_globe_2021_07-27_09-06_train_val_test/train/"
+  IMAGES_PATH_TEST: "/home/user/red_globe_2021_datasets/red_globe_2021_07-27_09-06_train_val_test/val/"
+  # DEPTH_PATH_TRAIN: "/home/user/red_globe_2021_datasets/depth_imgs/"
+  # DEPTH_PATH_TEST: "/home/user/red_globe_2021_datasets/depth_imgs/"
   IMAGE_SIZE: (150, 100)  # (1280, 720)
   CROP_SIZE: (275, 145)
   MASKING: True
