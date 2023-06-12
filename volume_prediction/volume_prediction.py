@@ -64,7 +64,7 @@ class CNNRegressor(nn.Module):
         x = torch.flatten(x, start_dim=1)
         x = self.dropout5(F.relu(self.fc1(x)))
         x = self.dropout6(F.relu(self.fc2(x)))
-        x = F.relu(self.fc3(x))
+        x = self.fc3(x)
         return x
 
 

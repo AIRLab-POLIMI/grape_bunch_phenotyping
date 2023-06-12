@@ -6,15 +6,15 @@ DATASET:
   IMAGES_PATH_TEST: "/home/user/red_globe_2021_datasets/red_globe_2021_07-27_09-06_train_val_test/val/"
   # DEPTH_PATH_TRAIN: "/home/user/red_globe_2021_datasets/depth_imgs/"
   # DEPTH_PATH_TEST: "/home/user/red_globe_2021_datasets/depth_imgs/"
-  IMAGE_SIZE: (150, 100)  # (1280, 720)
+  IMAGE_SIZE: (1280, 720)
   CROP_SIZE: (275, 145)
   MASKING: True
-  TARGET_SCALING: True
+  TARGET_SCALING: True  # specify a tuple (min, max), or True to get the values from training data
   NOT_OCCLUDED: True
   TARGET: "volume"
-  TYPE: "plants"
+  TYPE: "bunches"  # "bunches" or "plants"
 DATALOADER:
-  BATCH_SIZE: 51 # 40
+  BATCH_SIZE: 51 
 SOLVER:
   MOMENTUM: 0.3
   WEIGHT_DECAY: 0.000001
