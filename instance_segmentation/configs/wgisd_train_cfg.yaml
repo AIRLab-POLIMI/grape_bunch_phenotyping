@@ -1,4 +1,4 @@
-_BASE_: "scratch_mask_rcnn_R_50_FPN_9x_gn.yaml"   # _BASE_: "mask_rcnn_R_101_FPN_3x.yaml"
+_BASE_: "scratch_mask_rcnn_R_50_FPN_9x_gn.yaml"
 MODEL:
   ROI_HEADS:
     NUM_CLASSES: 1                # only has one class (bunch)

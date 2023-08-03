@@ -1,6 +1,6 @@
 import logging
 import os
-from instance_segmentation.configs.cstm_cfg import get_cstm_cfg_defaults
+from configs.cstm_cfg import get_cstm_cfg_defaults
 import torch
 import detectron2
 from detectron2.engine import default_argument_parser, default_setup, launch
@@ -34,7 +34,7 @@ from albumentations_wrapper import AlbumentationsWrapper
 from early_stopper import EarlyStopper
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
-                       mode='async',        # use 'debug' to turn off logging, 'async' otherwise
+                       mode='debug',        # use 'debug' to turn off logging, 'async' otherwise
                        name='scratch_mask_rcnn_R_50_FPN_9x_gn_training',
                        tags=['WGISG', 'official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
 
@@ -222,7 +222,7 @@ def do_train_test(cfg, args, cstm_cfg):
 
     early_stopper = None
     if cstm_cfg.EARLY_STOPPING.ENABLED:
-        early_stopper = EarlyStopper(cfg.EARLY_STOPPING.PATIENCE, cfg.EARLY_STOPPING.MIN_DELTA)
+        early_stopper = EarlyStopper(cstm_cfg.EARLY_STOPPING.PATIENCE, cstm_cfg.EARLY_STOPPING.MIN_DELTA)
 
     # ------ MODEL ------
 
