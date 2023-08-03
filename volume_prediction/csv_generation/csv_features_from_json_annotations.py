@@ -4,9 +4,9 @@ The features are:
 - bunch_id: unique identifier of the grape bunch
 - west: boolean value that indicates if the grape bunch is on the west side of the vine
 - cut: boolean value that indicates if the grape bunch is cut
-- date: date of the image acquisition
+- date (optional): date of the image acquisition for the year 2021
 - area: area of the grape bunch in the image
-- avg_depth: average depth (distance) of the grape bunch in the image
+- avg_depth (optional): average depth (distance) of the grape bunch in the image
 - not_occluded: boolean value that indicates if the grape bunch is occluded or not
 """
 
@@ -84,7 +84,7 @@ def compute_avgDepth(depth_img, binary_mask):
     return avg_depth
 
 
-def parse_json_annotation(annotation, images_json, depth_folder):
+def parse_json_annotation(annotation, images_json, depth_folder, include_date):
 
     img_id = annotation["image_id"]
     # Find image info corresponding to image ID
@@ -95,57 +95,70 @@ def parse_json_annotation(annotation, images_json, depth_folder):
     area_norm = area / (height * width)     # normalize by the total image number of pixels to account for different resolutions (but same camera and optic)
 
     # Retrieve date from image ID
-    date = retrieve_date_from_img_id(int(re.sub("\D", "", rgb_file_name)))
+    if include_date:
+        date = retrieve_date_from_img_id(int(re.sub("\D", "", rgb_file_name)))
 
-    # Compute avg depth of the annotation
-    if date != "2021-09-06":
+    # Compute avg depth of the annotation if depth images are available
+    if depth_folder:
         # Extract the binary mask corresponding to the polygon annotations with pycocotools
         binary_mask = bin_mask_frPoly(annotation, height, width)
         depth_file_name = rgb_file_name.replace("rgb", "depth")
         depth_img = cv2.imread(os.path.join(depth_folder, depth_file_name), cv2.IMREAD_ANYDEPTH)
         avg_depth = compute_avgDepth(depth_img, binary_mask)
-    else:
-        avg_depth = 0.0  # in 07-27 and 08-23 we calculate the avg depth of the image, in 09-06 we just give 0 to it since depth is unavailable
-
+    
     ann_dict = {}
     ann_dict["bunch_id"] = "g" + str(int(annotation["attributes"]["bunch_no"])) + "p" + str(int(annotation["attributes"]["plant_no"]))
     ann_dict["west"] = annotation["attributes"]["west"]
     ann_dict["cut"] = annotation["attributes"]["cut"]
-    ann_dict["date"] = date
+    if include_date:
+        ann_dict["date"] = date
     ann_dict["area"] = area_norm
-    ann_dict["avg_depth"] = avg_depth
+    if depth_folder:
+        ann_dict["avg_depth"] = avg_depth
     ann_dict["not_occluded"] = annotation["attributes"]["not_occluded"]
 
     return ann_dict
 
 
-def write_and_save_to_csv(ann_dict, csv_file, writer):
+def write_and_save_to_csv(ann_dict, csv_file, writer, depth_folder, include_date):
 
     with open(csv_file, 'a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow([ann_dict["bunch_id"], ann_dict["west"], ann_dict["cut"], ann_dict["date"], ann_dict["area"], ann_dict["avg_depth"], ann_dict["not_occluded"]])
+        body = [ann_dict["bunch_id"], ann_dict["west"], ann_dict["cut"], ann_dict["area"], ann_dict["not_occluded"]]
+        if include_date:
+            body += [ann_dict["date"]]
+        if depth_folder:
+            body += [ann_dict["avg_depth"]]
+        writer.writerow(body)
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--json_path", help="path of the json annotations file", default="/home/user/red_globe_2021_datasets/red_globe_2021_07-27_09-06/annotations/red_globe_2021_07-27_09-06.json")
-    parser.add_argument("--depth_folder", help="path of the depth images folder", default="/home/user/red_globe_2021_datasets/depth_imgs")
+    parser.add_argument("--depth_folder", help="path of the depth images folder", default=None)
     parser.add_argument("--csv_file", help="path of the output raw csv file that will be created", default="/home/user/red_globe_2021_datasets/volume_regression_csv/redglobe_2021_features.csv")
+    parser.add_argument("--include_date", help="whether to include the dates of data collection for the year 2021", default=False)
 
     args = vars(parser.parse_args())
     json_path = args["json_path"]
     depth_folder = args["depth_folder"]
     csv_file = args["csv_file"]
+    include_date = args["include_date"]
 
     with open(json_path) as f:
         json_data = json.load(f)
 
     with open(csv_file, 'w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["bunch_id", "west", "cut", "date", "area", "avg_depth", "not_occluded"])
+        header = ["bunch_id", "west", "cut", "area", "not_occluded"]
+        if include_date:
+            header += ["date"]
+        if depth_folder is not None:
+            header += ["avg_depth"]
+        writer.writerow(header)
 
     for annotation in json_data["annotations"]:
         if annotation.get("attributes").get("tagged"):
-            ann_parsed_dict = parse_json_annotation(annotation, json_data["images"], depth_folder)
-            write_and_save_to_csv(ann_parsed_dict, csv_file, writer)
+            ann_parsed_dict = parse_json_annotation(annotation, json_data["images"], depth_folder, include_date)
+            write_and_save_to_csv(ann_parsed_dict, csv_file, writer, depth_folder, include_date)

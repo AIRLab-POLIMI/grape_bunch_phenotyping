@@ -14,9 +14,9 @@ from datasets.vine_plants_dataset import VinePlantsDataset
 import neptune.new as neptune
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
-                       mode='debug',        # use 'debug' to turn off logging, 'async' otherwise
+                       mode='async',        # use 'debug' to turn off logging, 'async' otherwise
                        name='CNNRegressor',
-                       tags=['scaling_from_train', 'all_images', 'without_depth', 'stratified_split', 'not_occluded'])
+                       tags=['red_globe_2022', 'scaling_from_train', 'all_images', 'without_depth', 'not_occluded'])
 
 
 class CNNRegressor(nn.Module):

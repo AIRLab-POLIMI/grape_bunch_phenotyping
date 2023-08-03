@@ -1,7 +1,7 @@
 import logging
 import functools
 import os
-from configs.dataset_cfg import get_dataset_cfg_defaults
+from instance_segmentation.configs.cstm_cfg import get_cstm_cfg_defaults
 import torch
 import detectron2
 from detectron2.engine import default_argument_parser, default_setup, launch, default_writers
@@ -258,7 +258,7 @@ def main(args):
     cfg = setup(args)               # load detectron2 configurations
 
     # custom configurations
-    dataset_cfg = get_dataset_cfg_defaults()
+    dataset_cfg = get_cstm_cfg_defaults()
     dataset_cfg.merge_from_file("./configs/dataset_train_cfg.yaml")
     dataset_cfg.freeze()
 

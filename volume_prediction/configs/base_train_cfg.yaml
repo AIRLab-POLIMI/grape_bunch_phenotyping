@@ -1,20 +1,20 @@
 DATASET:
-  NAME: "red_globe_2021_volume_regression"
-  ANNOTATIONS_PATH_TRAIN: "/home/user/red_globe_2021_datasets/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_train.json"
-  ANNOTATIONS_PATH_TEST: "/home/user/red_globe_2021_datasets/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_val.json"
-  IMAGES_PATH_TRAIN: "/home/user/red_globe_2021_datasets/red_globe_2021_07-27_09-06_train_val_test/train/"
-  IMAGES_PATH_TEST: "/home/user/red_globe_2021_datasets/red_globe_2021_07-27_09-06_train_val_test/val/"
+  NAME: "red_globe_2022_volume_regression"
+  ANNOTATIONS_PATH_TRAIN: "/home/user/Red_Globe_2022_90deg/Split/annotations/annotations_train.json"
+  ANNOTATIONS_PATH_TEST: "/home/user/Red_Globe_2022_90deg/Split/annotations/annotations_test.json"
+  IMAGES_PATH_TRAIN: "/home/user/Red_Globe_2022_90deg/Split/train/"
+  IMAGES_PATH_TEST: "/home/user/Red_Globe_2022_90deg/Split/test/"
   # DEPTH_PATH_TRAIN: "/home/user/red_globe_2021_datasets/depth_imgs/"
   # DEPTH_PATH_TEST: "/home/user/red_globe_2021_datasets/depth_imgs/"
-  IMAGE_SIZE: (1280, 720)
-  CROP_SIZE: (275, 145)
+  IMAGE_SIZE: (1280, 720)  # (150, 100)
+  CROP_SIZE: (365, 152) # 2021: (275, 145); 2022; (365, 152)
   MASKING: True
   TARGET_SCALING: True  # specify a tuple (min, max), or True to get the values from training data
   NOT_OCCLUDED: True
   TARGET: "volume"
   TYPE: "bunches"  # "bunches" or "plants"
 DATALOADER:
-  BATCH_SIZE: 51 
+  BATCH_SIZE: 19  # 40 
 SOLVER:
   MOMENTUM: 0.3
   WEIGHT_DECAY: 0.000001

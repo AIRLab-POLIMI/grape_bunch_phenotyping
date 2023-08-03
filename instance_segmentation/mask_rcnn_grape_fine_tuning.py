@@ -1,6 +1,6 @@
 import logging
 import os
-from configs.dataset_cfg import get_dataset_cfg_defaults
+from instance_segmentation.configs.cstm_cfg import get_cstm_cfg_defaults
 import torch
 import detectron2
 from detectron2.engine import default_argument_parser, default_setup, launch
@@ -9,7 +9,6 @@ from detectron2.data import DatasetCatalog, MetadataCatalog
 from detectron2.data.datasets import load_coco_json
 from detectron2.data import transforms as T
 import albumentations as A
-from albumentations_wrapper import AlbumentationsWrapper
 from detectron2.data import DatasetMapper   # the default mapper
 from detectron2.data import build_detection_train_loader, build_detection_test_loader
 from detectron2.data import get_detection_dataset_dicts
@@ -27,11 +26,12 @@ try:
     from torch.optim.lr_scheduler import LRScheduler
 except ImportError:
     from torch.optim.lr_scheduler import _LRScheduler as LRScheduler
-
 from detectron2.solver import WarmupParamScheduler, LRMultiplier
+import neptune.new as neptune # Logging metadata with Neptune
 
-# Logging metadata with Neptune
-import neptune.new as neptune
+# custom modules
+from albumentations_wrapper import AlbumentationsWrapper
+from early_stopper import EarlyStopper
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='async',        # use 'debug' to turn off logging, 'async' otherwise
@@ -107,7 +107,8 @@ def do_test(model, test_data_loader, evaluator, val_loss_data_loader=None):
     # have the val loss comparable with the training loss we can leave
     # the model in training mode (?)
     # training_mode = model.training
-    # model.eval()                    
+    # model.eval()
+    avg_loss = None
     if val_loss_data_loader is not None:
         with torch.no_grad():
             batches_no = 0
@@ -116,21 +117,22 @@ def do_test(model, test_data_loader, evaluator, val_loss_data_loader=None):
                 loss_dict = model(data)
                 losses = sum(loss_dict.values())
                 assert torch.isfinite(losses).all(), loss_dict
-                
+
                 loss_dict_reduced = {"test_" + k: v.item()
                                     for k, v in comm.reduce_dict(loss_dict).items()}
                 losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-                loss_sum += losses_reduced 
+                loss_sum += losses_reduced
                 batches_no += 1
-            
+
             avg_loss = loss_sum / batches_no
 
             if comm.is_main_process():
                 # Test loss logging with Neptune
                 run['metrics/total_test_loss'].log(avg_loss)
+
     # model.train(training_mode)
-    
-    return results['segm']['AP']
+
+    return avg_loss
 
 
 def get_dataset_dicts(cfg, split_name: str):
@@ -148,7 +150,7 @@ def build_exp_lr_scheduler(cfg: CfgNode, optimizer: torch.optim.Optimizer) -> LR
     """
     Build an exponential LR scheduler.
     """
-    
+
     sched = ExponentialParamScheduler(
         start_value=cfg.SOLVER.BASE_LR,
         decay=cfg.SOLVER.GAMMA
@@ -179,7 +181,7 @@ def setup(args):
     return cfg
 
 
-def do_train_test(cfg, args):
+def do_train_test(cfg, args, cstm_cfg):
 
     # ------ DATA LOADERS ------
 
@@ -191,7 +193,7 @@ def do_train_test(cfg, args):
         AlbumentationsWrapper(A.GaussNoise(var_limit=(10, 50), mean=0, per_channel=True, always_apply=False, p=0.5)),
         AlbumentationsWrapper(A.PixelDropout(dropout_prob=0.01, per_channel=False, p=0.5)),
         T.RandomFlip(prob=0.5, horizontal=True, vertical=False),
-        T.RandomApply(T.RandomContrast(0.75, 1.25)),            # default probability of RandomApply is 0.5 
+        T.RandomApply(T.RandomContrast(0.75, 1.25)),              # default probability of RandomApply is 0.5 
         T.RandomApply(T.RandomSaturation(0.75, 1.25)),
         T.RandomApply(T.RandomBrightness(0.75, 1.25)),
         # T.Resize((1024, 1024))                                  # fixed resize for all images. Shape is a tuple (h, w)
@@ -200,7 +202,7 @@ def do_train_test(cfg, args):
 
     train_mapper = DatasetMapper(cfg,
                                  is_train=True,
-                                 augmentations=augs_list, # it overwites the default train augmentations (ResizeShortestEdge and flipping)
+                                 augmentations=augs_list,  # it overwites the default train augmentations (ResizeShortestEdge and flipping)
                                  image_format=cfg.INPUT.FORMAT,
                                  use_instance_mask=True)
 
@@ -210,15 +212,23 @@ def do_train_test(cfg, args):
 
     val_loss_data_loader = build_val_loss_loader(cfg, train_mapper)
 
+    # ------ EVALUATOR ------
+
     evaluator = get_evaluator(
         cfg, dataset_name, os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name)
     )
+
+    # ------ EARLY STOPPER ------
+
+    early_stopper = None
+    if cstm_cfg.EARLY_STOPPING.ENABLED:
+        early_stopper = EarlyStopper(cfg.EARLY_STOPPING.PATIENCE, cfg.EARLY_STOPPING.MIN_DELTA)
 
     # ------ MODEL ------
 
     model = build_model(cfg)
     logger.info("Model:\n{}".format(model))
-    
+
     if args.eval_only:
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
             cfg.MODEL.WEIGHTS, resume=args.resume
@@ -253,7 +263,7 @@ def do_train_test(cfg, args):
     max_iter = cfg.SOLVER.MAX_ITER
 
     periodic_checkpointer = PeriodicCheckpointer(
-        checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD, max_iter=max_iter 
+        checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD, max_iter=max_iter
     )
 
     logger.info("Starting training from iteration {}".format(start_iter))
@@ -287,10 +297,18 @@ def do_train_test(cfg, args):
                 and (iteration + 1) % cfg.TEST.EVAL_PERIOD == 0
                 and iteration != max_iter - 1
             ):
-                do_test(model, test_data_loader, evaluator, val_loss_data_loader)
+                avg_loss = do_test(model, test_data_loader, evaluator, val_loss_data_loader)
+
                 comm.synchronize()
 
+                # Early stopping
+                if early_stopper is not None:
+                    if early_stopper.early_stop(avg_loss):
+                        break
+
             periodic_checkpointer.step(iteration)
+
+        checkpointer.save("model_final.pth")
 
     return do_test(model, test_data_loader, evaluator)
 
@@ -301,12 +319,12 @@ def main(args):
     cfg = setup(args)               # load detectron2 configurations
 
     # custom configurations
-    dataset_cfg = get_dataset_cfg_defaults()
+    cstm_cfg = get_cstm_cfg_defaults()
     if args.eval_only:
-        dataset_cfg.merge_from_file("./configs/dataset_test_cfg.yaml")
+        cstm_cfg.merge_from_file("./configs/cstm_test_cfg.yaml")
     else:
-        dataset_cfg.merge_from_file("./configs/dataset_train_cfg.yaml")
-    dataset_cfg.freeze()
+        cstm_cfg.merge_from_file("./configs/cstm_train_cfg.yaml")
+    cstm_cfg.freeze()
 
     # ------ NEPTUNE LOGGING ------
 
@@ -336,13 +354,13 @@ def main(args):
     # ------ DATASETS ------
 
     for split_name in ['TRAIN', 'TEST']:
-        DatasetCatalog.register(dataset_cfg.DATASET.NAME+"_"+split_name,
-                                lambda: get_dataset_dicts(dataset_cfg, split_name))                     # register the dataset
-        MetadataCatalog.get(dataset_cfg.DATASET.NAME+"_"+split_name).thing_colors = [(255, 0, 0)]       # add color metadata for bunches
+        DatasetCatalog.register(cstm_cfg.DATASET.NAME+"_"+split_name,
+                                lambda: get_dataset_dicts(cstm_cfg, split_name))                     # register the dataset
+        MetadataCatalog.get(cstm_cfg.DATASET.NAME+"_"+split_name).thing_colors = [(255, 0, 0)]       # add color metadata for bunches
 
     # ------ TRAIN AND TEST ------
 
-    return do_train_test(cfg, args)
+    return do_train_test(cfg, args, cstm_cfg)
 
 
 if __name__ == "__main__":

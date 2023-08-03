@@ -67,6 +67,7 @@ class GrapeBunchesDataset(Dataset):
                     half_crop_height = math.ceil(crop_size[0]/2)
                     # check whether bboxes are distant from borders at least half of corresponding crop size
                     # rescale half_crop_{width,height} for img_size
+                    # TODO: is this check really necessary? -> Simply check if the annotation is cut
                     x_scale, y_scale = self.x_y_scale(img_width, img_height)
                     if x_scale != 1.0:
                         half_crop_width /= x_scale
