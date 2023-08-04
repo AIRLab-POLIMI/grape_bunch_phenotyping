@@ -1,5 +1,6 @@
-_BASE_: "scratch_mask_rcnn_R_50_FPN_9x_gn.yaml"   # _BASE_: "mask_rcnn_R_101_FPN_3x.yaml"
+_BASE_: "scratch_mask_rcnn_R_50_FPN_9x_gn.yaml"
 MODEL:
+  WEIGHTS: "../weights/GRAPE-164/model_0004999.pth"  # to start the training with custom pre-trained weights (like from WGISD)
   ROI_HEADS:
     NUM_CLASSES: 1                # only has one class (bunch)
     BATCH_SIZE_PER_IMAGE: 128     # The "RoIHead batch size". 128 is faster, and good enough for this toy dataset (default: 512)
@@ -18,10 +19,10 @@ DATALOADER:
 SOLVER:
   IMS_PER_BATCH: 2                # This is the real "batch size" commonly known to deep learning people
   BASE_LR: 0.01                   # possible values: 0.00025                
-  MAX_ITER: 9599                  # 48 train images -> 24 batches * 100 epochs = 2400 iterations
+  MAX_ITER: 2500                  # 51 train images -> 25 batches * 100 epochs = 2500 iterations
   STEPS: [1920, 2160]             # decay learning rate at (0.8 * MAX_ITER) and (0.9 * MAX_ITER) -> only used with the STEP lr scheduler
   WARMUP_ITERS: 70                # 2.5% of MAX_ITER  
   GAMMA: 0.5                      # It is used to control the learning rate decay over time
-  CHECKPOINT_PERIOD: 2400         # A model checkpoint will be saved if iteration is a multiple of period 
+  CHECKPOINT_PERIOD: 125         # A model checkpoint will be saved if iteration is a multiple of period 
 TEST:
-  EVAL_PERIOD: 24                 # 1 evaluation each epoch (with 2 imgs per batch). The period (in terms of steps) to evaluate the model during training
+  EVAL_PERIOD: 25                 # 1 evaluation each epoch (with 2 imgs per batch). The period (in terms of steps) to evaluate the model during training

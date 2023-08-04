@@ -36,7 +36,7 @@ from early_stopper import EarlyStopper
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
                        mode='debug',        # use 'debug' to turn off logging, 'async' otherwise
                        name='scratch_mask_rcnn_R_50_FPN_9x_gn_training',
-                       tags=['WGISG', 'official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
+                       tags=['early_stopping', 'red_globe_2021', 'official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
 
 
 logger = logging.getLogger("detectron2")
@@ -257,9 +257,12 @@ def do_train_test(cfg, args, cstm_cfg):
     checkpointer = DetectionCheckpointer(
         model, cfg.OUTPUT_DIR, optimizer=optimizer, scheduler=scheduler
     )
-    start_iter = (
-        checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=args.resume).get("iteration", -1) + 1
-    )
+
+    extra_data = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=args.resume)
+    start_iter = 0
+    if args.resume:
+        start_iter = extra_data.get("iteration", -1) + 1
+
     max_iter = cfg.SOLVER.MAX_ITER
 
     periodic_checkpointer = PeriodicCheckpointer(
@@ -304,11 +307,13 @@ def do_train_test(cfg, args, cstm_cfg):
                 # Early stopping
                 if early_stopper is not None:
                     if early_stopper.early_stop(avg_loss):
+                        print("Early stopping at iteration %d, because patience of %d reached" % (
+                            iteration, cstm_cfg.EARLY_STOPPING.PATIENCE))
                         break
 
             periodic_checkpointer.step(iteration)
 
-        checkpointer.save("model_final.pth")
+        checkpointer.save("model_final")
 
     return do_test(model, test_data_loader, evaluator)
 

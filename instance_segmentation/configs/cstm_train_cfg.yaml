@@ -1,15 +1,15 @@
 DATASET:
-  # NAME: "red_globe_2021_07-27_09-06"
-  # ANNOTATIONS_PATH_TRAIN: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_train.json"
-  # ANNOTATIONS_PATH_TEST: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_val.json"
-  # IMAGES_PATH_TRAIN: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/train/"
-  # IMAGES_PATH_TEST: "/home/bertoglio/red_globe_2021_07-27_09-06_train_val_test/val/"
-  NAME: "wgisd"
-  ANNOTATIONS_PATH_TRAIN: "/home/user/wgisd_split/training/annotations.json"
-  ANNOTATIONS_PATH_TEST: "/home/user/wgisd_split/val/annotations.json"
-  IMAGES_PATH_TRAIN: "/home/user/wgisd_split/training/images/"
-  IMAGES_PATH_TEST: "/home/user/wgisd_split/val/images/"
+  NAME: "red_globe_2021_07-27_09-06"
+  ANNOTATIONS_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_train.json"
+  ANNOTATIONS_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_val.json"
+  IMAGES_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/train/"
+  IMAGES_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/val/"
+  # NAME: "wgisd"
+  # ANNOTATIONS_PATH_TRAIN: "/home/user/wgisd_split/training/annotations.json"
+  # ANNOTATIONS_PATH_TEST: "/home/user/wgisd_split/val/annotations.json"
+  # IMAGES_PATH_TRAIN: "/home/user/wgisd_split/training/images/"
+  # IMAGES_PATH_TEST: "/home/user/wgisd_split/val/images/"
 EARLY_STOPPING:
   ENABLED: True
-  PATIENCE: 100
-  MIN_DELTA: 0.01
+  PATIENCE: 10
+  MIN_DELTA: 0.001

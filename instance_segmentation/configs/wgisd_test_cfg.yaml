@@ -1,0 +1,7 @@
+_BASE_: "wgisd_train_cfg.yaml"
+MODEL:
+  WEIGHTS: "../weights/GRAPE-164/model_0004999.pth"
+  ROI_HEADS:
+    SCORE_THRESH_TEST: 0.70       # Minimum score threshold (assuming scores in a [0, 1] range)
+INPUT:
+  MIN_SIZE_TEST: 0                # Set to zero to disable resize in testing
