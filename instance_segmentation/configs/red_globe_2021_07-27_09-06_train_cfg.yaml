@@ -1,6 +1,6 @@
 _BASE_: "scratch_mask_rcnn_R_50_FPN_9x_gn.yaml"
 MODEL:
-  WEIGHTS: "../weights/GRAPE-164/model_0004999.pth"  # to start the training with custom pre-trained weights (like from WGISD)
+  # WEIGHTS: "../weights/GRAPE-164/model_0004999.pth"  # to start the training with custom pre-trained weights (like from WGISD)
   ROI_HEADS:
     NUM_CLASSES: 1                # only has one class (bunch)
     BATCH_SIZE_PER_IMAGE: 128     # The "RoIHead batch size". 128 is faster, and good enough for this toy dataset (default: 512)

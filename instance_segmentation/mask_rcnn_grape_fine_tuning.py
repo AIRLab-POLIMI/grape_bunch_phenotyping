@@ -34,9 +34,9 @@ from albumentations_wrapper import AlbumentationsWrapper
 from early_stopper import EarlyStopper
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
-                       mode='debug',        # use 'debug' to turn off logging, 'async' otherwise
+                       mode='async',        # use 'debug' to turn off logging, 'async' otherwise
                        name='scratch_mask_rcnn_R_50_FPN_9x_gn_training',
-                       tags=['early_stopping', 'red_globe_2021', 'official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
+                       tags=['tune_all_fine_tuning', 'fine_tune_on_red_globe_2021', 'early_stopping', 'official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
 
 
 logger = logging.getLogger("detectron2")
@@ -241,6 +241,28 @@ def do_train_test(cfg, args, cstm_cfg):
             model, device_ids=[comm.get_local_rank()], broadcast_buffers=False
         )
 
+    # ------ SURGICAL FINE TUNING ------
+
+    if cstm_cfg.SURGICAL_FINE_TUNING.ENABLED:
+        for name, p in model.named_parameters():
+            if ('roi_heads' in name) and cstm_cfg.SURGICAL_FINE_TUNING.HEADS_UNFREEZE:
+                p.requires_grad = True
+            elif ('res3' in name) and cstm_cfg.SURGICAL_FINE_TUNING.RES3_UNFREEZE:
+                p.requires_grad = True
+            elif ('res4' in name) and cstm_cfg.SURGICAL_FINE_TUNING.RES4_UNFREEZE:
+                p.requires_grad = True
+            elif (('res4' in name) or ('fpn_lateral4' in name) or ('fpn_output4' in name)) and cstm_cfg.SURGICAL_FINE_TUNING.RES4_AND_FPN_UNFREEZE:
+                p.requires_grad = True
+            else:
+                p.requires_grad = False
+
+        print("Tuned modules:")
+        for name, p in model.named_parameters():
+            if p.requires_grad:
+                print(name)
+        total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print("N. of parameters to update: %i" % total_params)
+
     # ------ TRAIN ------
 
     # We tell the model that we are training.
@@ -350,7 +372,11 @@ def main(args):
               'eval_period': cfg.TEST.EVAL_PERIOD,
               'optimizer': 'SGD',
               'min_size_train': cfg.INPUT.MIN_SIZE_TRAIN,
-              'min_size_test': cfg.INPUT.MIN_SIZE_TEST
+              'min_size_test': cfg.INPUT.MIN_SIZE_TEST,
+              'weights': cfg.MODEL.WEIGHTS,
+              'early_stopping_enabled': cstm_cfg.EARLY_STOPPING.ENABLED,
+              'early_stopping_patience': cstm_cfg.EARLY_STOPPING.PATIENCE,
+              'early_stopping_min_delta': cstm_cfg.EARLY_STOPPING.MIN_DELTA,
               }
 
     # Pass parameters to the Neptune run object.
