@@ -34,9 +34,9 @@ from albumentations_wrapper import AlbumentationsWrapper
 from early_stopper import EarlyStopper
 
 run = neptune.init_run(project='AIRLab/grape-bunch-phenotyping',
-                       mode='async',        # use 'debug' to turn off logging, 'async' otherwise
+                       mode='debug',        # use 'debug' to turn off logging, 'async' otherwise
                        name='scratch_mask_rcnn_R_50_FPN_9x_gn_training',
-                       tags=['tune_all_fine_tuning', 'fine_tune_on_red_globe_2021', 'early_stopping', 'official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'freezeat_0', 'val_augm'])
+                       tags=['train_on_wgisd_red_globe_merged', 'early_stopping', 'official_AP_impl', 'ResizeShortestEdge', 'augms', 'random_apply_augms', 'val_augm'])
 
 
 logger = logging.getLogger("detectron2")
