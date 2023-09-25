@@ -67,7 +67,7 @@ def get_evaluator(cfg, dataset_name, output_folder=None):
 
     if len(evaluator_list) == 0:
         raise NotImplementedError(
-            "no Evaluator for the dataset {} with the type {}".format(dataset_name, evaluator_type)
+            "no Evaluator for the dataset {}".format(dataset_name)
         )
     if len(evaluator_list) == 1:
         return evaluator_list[0]
@@ -185,7 +185,7 @@ def do_train_test(cfg, args, cstm_cfg):
 
     # ------ DATA LOADERS ------
 
-    dataset_name = dataset_name = cfg.DATASETS.TEST[0]
+    dataset_name = cfg.DATASETS.TEST[0]
 
     # Define a sequence of augmentations:
     augs_list = [

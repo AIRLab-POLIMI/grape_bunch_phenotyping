@@ -5,3 +5,5 @@ MODEL:
     SCORE_THRESH_TEST: 0.9       # Minimum score threshold (assuming scores in a [0, 1] range)
 INPUT:
   MIN_SIZE_TEST: 0                # Set to zero to disable resize in testing
+DATASETS:
+  TEST: ("red_globe_2021_09_06_all_images_TEST",)
