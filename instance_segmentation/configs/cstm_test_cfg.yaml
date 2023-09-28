@@ -10,5 +10,5 @@ DATASET:
   # IMAGES_PATH_TRAIN: "/home/user/wgisd_split/training/images/"
   # IMAGES_PATH_TEST: "/home/user/wgisd_split/test/images/"
   NAME: "red_globe_2021_09_06_all_images"
-  IMAGES_PATH_TEST: "/home/user/red_globe_2021_09_06_all_images/Outer_13to25/rgb/"
-  ANNOTATIONS_PATH_TEST: "/home/user/red_globe_2021_09_06_all_images/Outer_13to25/outer_info.json"
+  IMAGES_PATH_TEST: "/home/user/red_globe_2021_09_06_all_images/Inner_1to12/rgb/"
+  ANNOTATIONS_PATH_TEST: "/home/user/red_globe_2021_09_06_all_images/Inner_1to12/inner_info.json"

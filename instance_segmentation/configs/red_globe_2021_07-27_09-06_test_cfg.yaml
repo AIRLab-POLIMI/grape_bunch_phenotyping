@@ -1,6 +1,6 @@
 _BASE_: "red_globe_2021_07-27_09-06_train_cfg.yaml"
 MODEL:
-  WEIGHTS: "../weights/GRAPE-166/model_0001249.pth"
+  WEIGHTS: "../weights/GRAPE-193/model_final.pth"
   ROI_HEADS:
     SCORE_THRESH_TEST: 0.9       # Minimum score threshold (assuming scores in a [0, 1] range)
 INPUT:

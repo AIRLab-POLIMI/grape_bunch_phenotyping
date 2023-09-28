@@ -22,7 +22,7 @@ def coco_to_mot(coco_json_file, output_dir):
         bbox = detection['bbox']
         confidence = detection['score']
 
-        # MOT format: frame_id, track_id, bb_left, bb_top, bb_width, bb_height, confidence, x, y, z
+        # MOT format: frame_id, track_id, bb_left, bb_top, bb_width, bb_height,confidence, x, y, z
         mot_line = f"{frame_id},-1,{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]},{confidence},-1,-1,-1"
 
         # Append the MOT line to the corresponding frame's entry in the dictionary
