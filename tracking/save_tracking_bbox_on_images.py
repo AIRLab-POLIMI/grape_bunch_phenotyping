@@ -1,3 +1,8 @@
+"""
+This script reads images and tracking detections in MOT
+format and write new images with overlayed bounding boxes
+and tracking IDs.
+"""
 import cv2
 import os
 import argparse
@@ -55,7 +60,7 @@ def process_images(image_dir, image_ext, detections_file, output_dir):
                 cv2.putText(image, str(tracking_id), ((bbox[0]+bbox[2])//2-10, (bbox[1]+bbox[3])//2), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
         # Save the image with bounding boxes and tracking IDs in the output directory
-        output_path = os.path.join(output_dir, f"track_image{frame_no}.jpg")
+        output_path = os.path.join(output_dir, f"track_image{frame_no}.{image_ext}")
         cv2.imwrite(output_path, image)
 
     print(f"Saved {len(detections)} images with detections in '{output_dir}'")
