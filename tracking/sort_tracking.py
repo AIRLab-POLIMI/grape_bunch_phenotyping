@@ -33,8 +33,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("mot_detections_path", help="path of the mot detections txt file", type=str)
     parser.add_argument("output_dir", help="path of the output directory", type=str)
-    parser.add_argument("--max_age", help="max age", type=int, default=1)
-    parser.add_argument("--min_hits", help="min hits", type=int, default=3)
+    parser.add_argument("--max_age", help="The time that can pass without the id assignment.", type=int, default=15)
+    parser.add_argument("--min_hits", help="The minimum value of hits in a track such that it gets displayed in the outputs.", type=int, default=15)
     parser.add_argument("--iou_threshold", help="iou threshold", type=float, default=0.3)
     args = vars(parser.parse_args())
 
