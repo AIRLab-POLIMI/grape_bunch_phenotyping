@@ -12,7 +12,7 @@ def track(mot_detections_path, output_dir, max_age=1, min_hits=3, iou_threshold=
     mot_tracker = Sort(max_age, min_hits, iou_threshold)
     seq_dets = np.loadtxt(mot_detections_path, delimiter=',')
 
-    with open(os.path.join(output_dir, 'output_det.txt'), 'w') as out_file:
+    with open(os.path.join(output_dir, 'SORT_output_det.txt'), 'w') as out_file:
         for frame in range(int(seq_dets[:, 0].max())):
             frame += 1  # detection and frame numbers begin at 1
             dets = seq_dets[seq_dets[:, 0] == frame, 2:7]
