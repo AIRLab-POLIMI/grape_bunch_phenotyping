@@ -30,7 +30,7 @@ def process_images(image_dir, image_ext, detections_file, output_dir):
             if frame_no not in detections:
                 detections[frame_no] = []
             detections[frame_no].append({'bbox': bbox, 'tracking_id': object_id})
-    
+
     # Create a dictionary to store random colors for each tracking ID
     id_colors = {}
 
