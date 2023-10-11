@@ -12,7 +12,7 @@ def track(mot_detections_path, output_dir, max_age=1, min_hits=3, iou_threshold=
     mot_tracker = Sort(max_age, min_hits, iou_threshold)
     seq_dets = np.loadtxt(mot_detections_path, delimiter=',')
 
-    with open(os.path.join(output_dir, 'SORT_output_det.txt'), 'w') as out_file:
+    with open(os.path.join(output_dir, 'sort_output_det.txt'), 'w') as out_file:
         for frame in range(int(seq_dets[:, 0].max())):
             frame += 1  # detection and frame numbers begin at 1
             dets = seq_dets[seq_dets[:, 0] == frame, 2:7]
@@ -33,8 +33,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("mot_detections_path", help="path of the mot detections txt file", type=str)
     parser.add_argument("output_dir", help="path of the output directory", type=str)
-    parser.add_argument("--max_age", help="The time that can pass without the id assignment.", type=int, default=15)
-    parser.add_argument("--min_hits", help="The minimum value of hits in a track such that it gets displayed in the outputs.", type=int, default=15)
+    parser.add_argument("--max_age", help="The time that can pass without the id assignment.", type=int, default=10)
+    parser.add_argument("--min_hits", help="The minimum value of hits in a track such that it gets displayed in the outputs.", type=int, default=3)
     parser.add_argument("--iou_threshold", help="iou threshold", type=float, default=0.3)
     args = vars(parser.parse_args())
 
