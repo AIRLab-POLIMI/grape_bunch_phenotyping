@@ -34,8 +34,14 @@ def process_images(image_dir, image_ext, detections_file, output_dir):
     # Create a dictionary to store random colors for each tracking ID
     id_colors = {}
 
+    # List all the files in the directory
+    file_list = os.listdir(image_dir)
+
+    # Filter and sort the file list based on numeric part of the filename
+    img_filenames = [filename for filename in file_list if filename.endswith(image_ext)]
+
     # Loop through the images in the directory
-    for frame_no in range(1, len(detections) + 1):
+    for frame_no in range(1, len(img_filenames) + 1):
         image_path = os.path.join(image_dir, f"image{frame_no}.{image_ext}")  # Assuming image filenames are like "image1.ext", "image2.ext", etc.
         image = cv2.imread(image_path)
 
