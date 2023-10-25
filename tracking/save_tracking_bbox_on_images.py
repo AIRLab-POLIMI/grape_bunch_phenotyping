@@ -13,7 +13,7 @@ def get_random_color():
     return (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
 
-def process_images(image_dir, image_ext, detections_file, output_dir):
+def process_images(image_dir, image_ext, detections_file, output_dir, only_detection):
     # Create the output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
@@ -54,16 +54,19 @@ def process_images(image_dir, image_ext, detections_file, output_dir):
                 bbox = detection['bbox']
                 tracking_id = detection['tracking_id']
 
-                # Generate a random color for this tracking ID (and store it for consistency)
-                if tracking_id not in id_colors:
-                    id_colors[tracking_id] = get_random_color()
-                color = id_colors[tracking_id]
+                color = (255, 0, 0)
+                if not only_detection:
+                    # Generate a random color for this tracking ID (and store it for consistency)
+                    if tracking_id not in id_colors:
+                        id_colors[tracking_id] = get_random_color()
+                    color = id_colors[tracking_id]
 
                 # Draw bounding box
                 cv2.rectangle(image, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
 
-                # Write tracking ID
-                cv2.putText(image, str(tracking_id), ((bbox[0]+bbox[2])//2-10, (bbox[1]+bbox[3])//2), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                if not only_detection:
+                    # Write tracking ID
+                    cv2.putText(image, str(tracking_id), ((bbox[0]+bbox[2])//2-10, (bbox[1]+bbox[3])//2), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
         # Save the image with bounding boxes and tracking IDs in the output directory
         output_path = os.path.join(output_dir, f"track_image{frame_no}.{image_ext}")
@@ -78,6 +81,7 @@ if __name__ == "__main__":
     parser.add_argument("image_ext", help="Extension of the images", type=str)
     parser.add_argument("detections_file", help="Path to the MOT format detections file", type=str)
     parser.add_argument("output_dir", help="Output directory for processed images", type=str)
+    parser.add_argument("--only_detection", help="Whether to save the detections only. Bboxes are of the same color and without ids.", type=bool, default=False)
     args = parser.parse_args()
 
-    process_images(args.image_dir, args.image_ext, args.detections_file, args.output_dir)
+    process_images(args.image_dir, args.image_ext, args.detections_file, args.output_dir, args.only_detection)
