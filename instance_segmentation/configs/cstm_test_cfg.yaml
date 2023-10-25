@@ -1,17 +1,24 @@
 DATASET:
-  # NAME: "red_globe_2021_07-27_09-06"
-  # ANNOTATIONS_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_train.json"
-  # ANNOTATIONS_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_test.json"
-  # IMAGES_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/train/"
-  # IMAGES_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/test/"
+  NAME: "red_globe_2021_07-27_09-06"
+  ANNOTATIONS_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_train.json"
+  ANNOTATIONS_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/annotations/annotations_test.json"
+  IMAGES_PATH_TRAIN: "/home/user/red_globe_2021_07-27_09-06_train_val_test/train/"
+  IMAGES_PATH_TEST: "/home/user/red_globe_2021_07-27_09-06_train_val_test/test/"
+
   # NAME: "wgisd"
   # ANNOTATIONS_PATH_TRAIN: "/home/user/wgisd_split/training/annotations.json"
   # ANNOTATIONS_PATH_TEST: "/home/user/wgisd_split/test/annotations.json"
   # IMAGES_PATH_TRAIN: "/home/user/wgisd_split/training/images/"
   # IMAGES_PATH_TEST: "/home/user/wgisd_split/test/images/"
+
   # NAME: "red_globe_2021_09_06_all_images"
   # IMAGES_PATH_TEST: "/home/user/red_globe_2021_09_06_all_images/Inner_1to12/rgb/"
   # ANNOTATIONS_PATH_TEST: "/home/user/red_globe_2021_09_06_all_images/Inner_1to12/inner_info.json"
-  NAME: "red_globe_2022_90deg_all_images"
-  IMAGES_PATH_TEST: "/home/user/Red_Globe_2022_90deg/red_globe_2022_90deg_all_images/Inner_1to12/rgb"
-  ANNOTATIONS_PATH_TEST: "/home/user/Red_Globe_2022_90deg/red_globe_2022_90deg_all_images/Inner_1to12/inner_info.json"
+
+  # NAME: "red_globe_2022_90deg_all_images"
+  # IMAGES_PATH_TEST: "/home/user/Red_Globe_2022_90deg/red_globe_2022_90deg_all_images/Inner_1to12/rgb"
+  # ANNOTATIONS_PATH_TEST: "/home/user/Red_Globe_2022_90deg/red_globe_2022_90deg_all_images/Inner_1to12/inner_info.json"
+  
+  # NAME: "red_globe_2022_90deg"
+  # IMAGES_PATH_TEST: "/home/user/Red_Globe_2022_90deg/Raw/images"
+  # ANNOTATIONS_PATH_TEST: "/home/user/Red_Globe_2022_90deg/Raw/annotations/instances_default.json"

@@ -19,7 +19,7 @@ def muSSP_first_pass_tracking(detections):
                             containing the detected object.
 
     Returns:
-        - trajectories: list of lists of Detection2D. Each list of detections is a single track. 
+        - trajectories: list of lists of Detection2D. Each list of detections is a single track.
 
     """
 
@@ -37,12 +37,12 @@ def muSSP_first_pass_tracking(detections):
 
     weight_distance = lambda d1, d2: wf.weight_distance_detections_2d(d1, d2,
                                                                       sigma_jump=1, sigma_distance=20,
-                                                                      max_distance=40,
+                                                                      max_distance=60,
                                                                       use_color_histogram=False, use_bbox=False)
 
     weight_confidence = lambda d: wf.weight_confidence_detections_2d(d, mul=1, bias=0)
 
-    g = mot3d.build_graph(mot3d_dets, weight_source_sink=20,
+    g = mot3d.build_graph(mot3d_dets, weight_source_sink=10,
                           max_jump=4, verbose=True,
                           weight_confidence=weight_confidence,
                           weight_distance=weight_distance)
@@ -66,9 +66,9 @@ def muSSP_second_pass_tracking(trajectories):
 
     tracklets = []
     for traj in trajectories:
-        tracklets += mot3d.split_trajectory_modulo(traj, length=5)
+        tracklets += mot3d.split_trajectory_modulo(traj, length=3)
 
-    tracklets = mot3d.remove_short_trajectories(tracklets, th_length=2)
+    tracklets = mot3d.remove_short_trajectories(tracklets, th_length=1)
 
     print("Building graph on tracklets...")
 
@@ -81,7 +81,7 @@ def muSSP_second_pass_tracking(trajectories):
 
     weight_confidence_t = lambda t: wf.weight_confidence_tracklets_2d(t, mul=1, bias=0)
 
-    g = mot3d.build_graph(detections_tracklets, weight_source_sink=1,
+    g = mot3d.build_graph(detections_tracklets, weight_source_sink=0.5,
                           max_jump=20, verbose=True,
                           weight_confidence=weight_confidence_t,
                           weight_distance=weight_distance_t)

@@ -6,4 +6,4 @@ MODEL:
 INPUT:
   MIN_SIZE_TEST: 0                # Set to zero to disable resize in testing
 DATASETS:
-  TEST: ("red_globe_2022_90deg_all_images_TEST",)
+  TEST: ("red_globe_2022_90deg_TEST",)
